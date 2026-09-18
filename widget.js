@@ -2,6 +2,16 @@
 (function () {
   "use strict";
 
+  /* Виджет открывается только по ссылке с ключом (?key=... — её генерирует
+     settings.html для OBS) или после ввода пароля. */
+  if (window.studioGate && window.studioGate.requireKey) {
+    window.studioGate.requireKey(start);
+    return;
+  }
+  start();
+
+  function start() {
+
   var params = new URLSearchParams(location.search);
 
   var SOUND = params.get("sound") !== "0" && (typeof SETTINGS === "undefined" || SETTINGS.sound !== false);
@@ -43,20 +53,64 @@
     document.head.appendChild(st);
   })();
 
-  /* ---------- звук (WebAudio, без файлов) — мягкий короткий «блип» ---------- */
+  /* ---------- звук: свой mp3 из базы, иначе стандартный «блип» ---------- */
   var actx = null;
+  var customBuf = null; /* AudioBuffer своего звука (mp3 из настроек) */
+
+  function ensureCtx() {
+    var Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return null;
+    if (!actx) actx = new Ctx();
+    if (actx.state === "suspended") { try { actx.resume(); } catch (e) {} }
+    return actx;
+  }
+
+  function b64ToArrayBuffer(b64) {
+    var bin = atob(b64);
+    var bytes = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return bytes.buffer;
+  }
+
+  /* rec = { b64, mime, name } из базы (узел widgetSound) */
+  function applyCustomSound(rec) {
+    customBuf = null;
+    if (!SOUND || !rec || typeof rec.b64 !== "string" || !rec.b64) return;
+    var ctx = ensureCtx();
+    if (!ctx) return;
+    try {
+      ctx.decodeAudioData(b64ToArrayBuffer(rec.b64)).then(function (buf) {
+        customBuf = buf;
+      })["catch"](function () {
+        customBuf = null; /* файл не декодировался — играет стандартный звук */
+      });
+    } catch (e) { customBuf = null; }
+  }
+
   function chime() {
     if (!SOUND) return;
+    var ctx = ensureCtx();
+    if (!ctx) return;
+
+    /* свой mp3 — приоритет */
+    if (customBuf) {
+      try {
+        var src = ctx.createBufferSource();
+        var cg = ctx.createGain();
+        src.buffer = customBuf;
+        cg.gain.value = Math.min(Math.max(VOL, 0), 1);
+        src.connect(cg); cg.connect(ctx.destination);
+        src.start(0);
+        return;
+      } catch (e) { /* падаем на стандартный блип */ }
+    }
+
     try {
-      var Ctx = window.AudioContext || window.webkitAudioContext;
-      if (!Ctx) return;
-      if (!actx) actx = new Ctx();
-      if (actx.state === "suspended") actx.resume();
-      var t = actx.currentTime;
+      var t = ctx.currentTime;
       /* одна мягкая нота с тёплым тембром (треугольник) и плавным затуханием */
-      var o = actx.createOscillator();
-      var g = actx.createGain();
-      var f = actx.createBiquadFilter(); /* срез верхов — убирает резкость */
+      var o = ctx.createOscillator();
+      var g = ctx.createGain();
+      var f = ctx.createBiquadFilter(); /* срез верхов — убирает резкость */
       f.type = "lowpass";
       f.frequency.value = 1800;
       o.type = "triangle";
@@ -66,7 +120,7 @@
       g.gain.setValueAtTime(0.0001, t);
       g.gain.exponentialRampToValueAtTime(v, t + 0.03);
       g.gain.exponentialRampToValueAtTime(0.0001, t + 0.5);
-      o.connect(f); f.connect(g); g.connect(actx.destination);
+      o.connect(f); f.connect(g); g.connect(ctx.destination);
       o.start(t); o.stop(t + 0.6);
     } catch (e) { console.warn("Не удалось воспроизвести звук:", e); }
   }
@@ -210,12 +264,18 @@
   if (!db) {
     var warn = document.createElement("div");
     warn.className = "card";
-    warn.textContent = "⚠️ Не настроен config.js — открой README.md и сделай шаги 1–2.";
+    warn.textContent = "⚠️ Не настроен config.js — стримеру нужно вставить конфиг Firebase.";
     wrap.appendChild(warn);
     return;
   }
 
   var ref = db.ref("submissions");
+
+  /* свой звук: слушаем узел widgetSound — замена подхватывается на лету */
+  db.ref("widgetSound").on("value", function (snap) {
+    applyCustomSound(snap.val());
+  }, function () { /* нет прав на узел — тихо играем стандартный звук */ });
+
   var buffer = [];
   var baseline = null;
   var ready = false;
@@ -238,7 +298,7 @@
   }, function (err) {
     var w = document.createElement("div");
     w.className = "card";
-    w.textContent = "⚠️ Нет доступа к базе: " + ((err && err.message) || "ошибка") + ". Проверь правила Firebase (README, Шаг 6).";
+    w.textContent = "⚠️ Нет доступа к базе: " + ((err && err.message) || "ошибка") + ". Проверь правила доступа в Firebase (Realtime Database → Rules).";
     wrap.appendChild(w);
   });
 
@@ -253,5 +313,7 @@
     ready = true;
     console.error(err);
   });
+
+  }
 })();
 

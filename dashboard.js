@@ -123,7 +123,7 @@
   $("refresh").addEventListener("click", function () { location.reload(); });
 
   if (!db) {
-    showError("База не подключена: заполни config.js (шаги 1–2 в README.md).");
+    showError("База не подключена: заполни config.js (конфиг Firebase).");
     return;
   }
 
@@ -133,7 +133,7 @@
     add(snap.key, snap.val());
   }, function (err) {
     showError("Нет доступа к базе: " + ((err && err.message) || "ошибка") +
-      ". Проверь правила в Firebase (README, Шаг 6) — тестовый режим действует 30 дней.");
+      ". Проверь правила доступа в Firebase (Realtime Database → Rules) — тестовый режим действует 30 дней.");
   });
 
   ref.on("child_removed", function (snap) {

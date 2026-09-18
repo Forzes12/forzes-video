@@ -32,8 +32,12 @@ input[type=range]{width:100%;accent-color:#8b5cf6;cursor:pointer}
 .sl:before{content:"";position:absolute;width:17px;height:17px;border-radius:50%;background:#fff;top:3px;left:3px;transition:.2s}
 .switch input:checked+.sl{background:#8b5cf6}
 .switch input:checked+.sl:before{transform:translateX(19px)}
-select{width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);border-radius:10px;padding:10px 12px;color:#eef1ff;font:inherit;font-size:13.5px;outline:none;cursor:pointer}
+select{width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);border-radius:10px;padding:10px 12px;color:#eef1ff;font:inherit;font-size:13.5px;outline:none;cursor:pointer;color-scheme:dark}
+select option{background:#12162a;color:#eef1ff}
+select option:checked{background:#7c3aed;color:#fff}
 select:focus{border-color:#8b5cf6}
+#sndStatus.ok{color:#34d399}
+#sndStatus.err{color:#f87171}
 .preview-box{position:sticky;top:0}
 .moni{width:320px;min-height:220px;overflow:hidden;border:1px dashed rgba(255,255,255,.18);border-radius:14px;padding:14px;background:repeating-conic-gradient(rgba(255,255,255,.045) 0% 25%,transparent 0% 50%) 50%/22px 22px}
 .moni-cap{font-size:11px;color:#6d76a3;margin-top:8px;text-align:center}
@@ -71,7 +75,18 @@ button.test{background:rgba(52,211,153,.16);border:1px solid rgba(52,211,153,.45
         <div class="row" id="volRow">
           <label>Громкость <b id="volVal">30%</b></label>
           <input type="range" id="vol" min="5" max="100" step="5" value="30">
-          <div class="hint">Мягкий короткий «блип». Рекомендую 20–40%, чтобы не резало слух.</div>
+          <div class="hint">Громкость и стандартного «блипа», и твоего mp3. Рекомендую 20–40%, чтобы не резало слух.</div>
+        </div>
+        <div class="row" id="sndRow">
+          <label>Свой звук (mp3) <b id="sndName">стандартный «блип»</b></label>
+          <input type="file" id="sndFile" accept=".mp3,.wav,.ogg,audio/mpeg,audio/wav,audio/ogg" hidden>
+          <div class="btnrow">
+            <button type="button" class="ghost" id="sndPick">📂 Выбрать mp3 из проводника</button>
+            <button type="button" class="ghost" id="sndPlay">▶ Прослушать</button>
+            <button type="button" class="ghost" id="sndReset">↺ Сбросить</button>
+          </div>
+          <div class="hint" id="sndStatus"></div>
+          <div class="hint">Выбери файл в проводнике — он сохранится в базе, и виджет в OBS сам начнёт играть его вместо стандартного звука. Обновлять источник в OBS не нужно. Лимит — 2 МБ.</div>
         </div>
       </div>
 
@@ -155,6 +170,9 @@ button.test{background:rgba(52,211,153,.16);border:1px solid rgba(52,211,153,.45
   <div class="foot"><a href="index.html">← на страницу отправки</a> · <a href="dashboard.html">панель заявок</a></div>
 </div>
 <script src="protect.js"></script>
+<script src="config.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 <script>
 (function () {
   "use strict";
@@ -183,6 +201,113 @@ button.test{background:rgba(52,211,153,.16);border:1px solid rgba(52,211,153,.45
   var obsW = document.getElementById("obsW");
   var obsH = document.getElementById("obsH");
 
+  /* ---------- свой звук (mp3 из проводника) ---------- */
+  var sndFile = document.getElementById("sndFile");
+  var sndPick = document.getElementById("sndPick");
+  var sndPlay = document.getElementById("sndPlay");
+  var sndReset = document.getElementById("sndReset");
+  var sndName = document.getElementById("sndName");
+  var sndStatus = document.getElementById("sndStatus");
+  var sndRow = document.getElementById("sndRow");
+
+  var MAX_SND = 2 * 1024 * 1024; /* 2 МБ */
+  var hasCustom = false;
+  var sndAudio = new Audio();
+  var soundRef = null;
+  var sndDb = initDatabase();
+  if (sndDb) soundRef = sndDb.ref("widgetSound");
+
+  function sndMsg(text, cls) {
+    sndStatus.textContent = text;
+    sndStatus.className = "hint" + (cls ? " " + cls : "");
+  }
+
+  function sndSetSrc(b64, mime) {
+    sndAudio.src = "data:" + (mime || "audio/mpeg") + ";base64," + b64;
+  }
+
+  function sndPlayCustom(s) {
+    sndAudio.volume = Math.min(Math.max(s.vol, 0), 1);
+    try { sndAudio.currentTime = 0; } catch (e) {}
+    var p = sndAudio.play();
+    if (p && p["catch"]) p["catch"](function () {
+      sndMsg("Браузер заблокировал звук — нажми «Прослушать» ещё раз.", "err");
+    });
+  }
+
+  function saveSound(rec) {
+    if (!soundRef) {
+      sndMsg("База не подключена (проверь config.js) — звук негде сохранить.", "err");
+      return;
+    }
+    sndMsg("Сохраняю в базу…");
+    soundRef.set(rec).then(function () {
+      hasCustom = true;
+      sndName.textContent = rec.name;
+      sndSetSrc(rec.b64, rec.mime);
+      sndMsg("Готово! Виджет в OBS уже играет этот звук — обновлять источник не нужно.", "ok");
+    })["catch"](function (err) {
+      sndMsg("Не удалось сохранить: " + ((err && err.message) || "ошибка") +
+        ". Проверь правила базы Firebase: узел widgetSound должен быть разрешён.", "err");
+    });
+  }
+
+  sndPick.addEventListener("click", function () { sndFile.click(); });
+
+  sndFile.addEventListener("change", function () {
+    var f = sndFile.files && sndFile.files[0];
+    sndFile.value = ""; /* чтобы можно было выбрать тот же файл повторно */
+    if (!f) return;
+    if (f.size > MAX_SND) {
+      sndMsg("Файл " + (f.size / 1048576).toFixed(1) + " МБ — слишком большой. Нужен звук до 2 МБ.", "err");
+      return;
+    }
+    var reader = new FileReader();
+    sndMsg("Читаю файл…");
+    reader.onload = function () {
+      var m = String(reader.result || "").match(/^data:([^;]+);base64,(.+)$/);
+      if (!m) { sndMsg("Не получилось прочитать файл. Попробуй другой mp3.", "err"); return; }
+      saveSound({ b64: m[2], mime: m[1], name: f.name, ts: Date.now() });
+    };
+    reader.onerror = function () { sndMsg("Не получилось прочитать файл.", "err"); };
+    reader.readAsDataURL(f);
+  });
+
+  sndPlay.addEventListener("click", function () {
+    var s = state();
+    if (!s.sound) { sndMsg("Звуковое уведомление выключено тумблером выше.", "err"); return; }
+    if (hasCustom) { sndPlayCustom(s); return; }
+    playTest(); /* стандартный блип */
+  });
+
+  sndReset.addEventListener("click", function () {
+    if (!soundRef) { sndMsg("База не подключена.", "err"); return; }
+    sndMsg("Убираю свой звук…");
+    soundRef.remove().then(function () {
+      hasCustom = false;
+      sndName.textContent = "стандартный «блип»";
+      sndAudio.removeAttribute("src");
+      try { sndAudio.load(); } catch (e) {}
+      sndMsg("Сброшено — снова играет стандартный «блип».", "ok");
+    })["catch"](function (err) {
+      sndMsg("Не удалось сбросить: " + ((err && err.message) || "ошибка"), "err");
+    });
+  });
+
+  /* подхватываем звук, уже сохранённый в базе */
+  if (soundRef) {
+    soundRef.once("value").then(function (snap) {
+      var rec = snap.val();
+      if (rec && typeof rec.b64 === "string" && rec.b64) {
+        hasCustom = true;
+        sndName.textContent = rec.name || "свой звук";
+        sndSetSrc(rec.b64, rec.mime);
+      }
+    })["catch"](function (err) {
+      sndMsg("Не удалось прочитать сохранённый звук: " + ((err && err.message) || "ошибка"), "err");
+    });
+  }
+
   var DEMO = { nick: "ТЕСТ", message: "Так будет выглядеть уведомление о новом видео 👀" };
   var DEMO_ID = "dQw4w9WgXcQ";
 
@@ -209,6 +334,7 @@ button.test{background:rgba(52,211,153,.16);border:1px solid rgba(52,211,153,.45
     if (s.ain !== "slide-right") q.push("ain=" + s.ain);
     if (s.aout !== "slide-right") q.push("aout=" + s.aout);
     if (s.spd !== 0.45) q.push("spd=" + s.spd);
+    if (window.studioGate && window.studioGate.hash) q.push("key=" + window.studioGate.hash);
     if (withTest) q.push("test=1");
     return base + (q.length ? "?" + q.join("&") : "");
   }
@@ -288,6 +414,7 @@ button.test{background:rgba(52,211,153,.16);border:1px solid rgba(52,211,153,.45
   function playTest() {
     var s = state();
     if (!s.sound) return;
+    if (hasCustom) { sndPlayCustom(s); return; }
     try {
       var Ctx = window.AudioContext || window.webkitAudioContext;
       if (!Ctx) return;
@@ -323,6 +450,7 @@ button.test{background:rgba(52,211,153,.16);border:1px solid rgba(52,211,153,.45
     animStyle.textContent = kfIn(s.ain, 1) + kfOut(s.aout, 1);
     volRow.style.opacity = soundEl.checked ? "1" : ".4";
     volEl.disabled = !soundEl.checked;
+    sndRow.style.opacity = soundEl.checked ? "1" : ".4";
     durRow.classList.toggle("hidden", durMode.value !== "custom");
     renderPreview();
     urlEl.value = buildUrl(false);

@@ -47,6 +47,10 @@
   var LS_KEY = "forzes_studio_ok";
   var overlay = null;
 
+  /* Пароль теперь спрашивается при каждом заходе.
+     Стираем старую метку «уже вошёл», если она осталась с прошлых версий. */
+  try { localStorage.removeItem(LS_KEY); } catch (e) {}
+
   function sha256hex(str) {
     return crypto.subtle.digest(
       "SHA-256",
@@ -212,9 +216,7 @@
 
         if (hex === HASH) {
 
-          try {
-            localStorage.setItem(LS_KEY, "1");
-          } catch (e) {}
+          /* вход не запоминаем — при следующем заходе пароль спросится снова */
 
           overlay.parentNode.removeChild(overlay);
           overlay = null;
@@ -271,30 +273,46 @@
 
   var pending = null;
 
+  function ask(then) {
+
+    pending = then;
+
+    if (document.body) {
+      show();
+    } else {
+      document.addEventListener("DOMContentLoaded", function () {
+        show();
+      });
+    }
+  }
+
   window.studioGate = {
 
-    require: function (then) {
+    /* SHA-256-хеш пароля — settings.html вставляет его в ссылку виджета как ?key=... */
+    hash: HASH,
 
-      var ok = false;
+    /* без запоминания: пароль запрашивается при каждом открытии страницы */
+    require: function (then) {
+      ask(then);
+    },
+
+    /* тихий вход по ключу в ссылке (?key=...) — для виджета в OBS.
+       Ключ — это хеш пароля: OBS открывает виджет без вопросов,
+       а все остальные видят запрос пароля. */
+    requireKey: function (then) {
+
+      var k = null;
 
       try {
-        ok = localStorage.getItem(LS_KEY) === "1";
+        k = new URLSearchParams(location.search).get("key");
       } catch (e) {}
 
-      if (ok) {
+      if (k && k === HASH) {
         then();
         return;
       }
 
-      pending = then;
-
-      if (document.body) {
-        show();
-      } else {
-        document.addEventListener("DOMContentLoaded", function () {
-          show();
-        });
-      }
+      ask(then);
     }
   };
 
