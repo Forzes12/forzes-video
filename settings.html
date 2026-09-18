@@ -35,7 +35,7 @@ input[type=range]{width:100%;accent-color:#8b5cf6;cursor:pointer}
 select{width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);border-radius:10px;padding:10px 12px;color:#eef1ff;font:inherit;font-size:13.5px;outline:none;cursor:pointer}
 select:focus{border-color:#8b5cf6}
 .preview-box{position:sticky;top:0}
-.moni{width:320px;min-height:220px;border:1px dashed rgba(255,255,255,.18);border-radius:14px;padding:14px;background:repeating-conic-gradient(rgba(255,255,255,.045) 0% 25%,transparent 0% 50%) 50%/22px 22px}
+.moni{width:320px;min-height:220px;overflow:hidden;border:1px dashed rgba(255,255,255,.18);border-radius:14px;padding:14px;background:repeating-conic-gradient(rgba(255,255,255,.045) 0% 25%,transparent 0% 50%) 50%/22px 22px}
 .moni-cap{font-size:11px;color:#6d76a3;margin-top:8px;text-align:center}
 .out{margin-top:16px;background:rgba(18,22,40,.85);border:1px solid rgba(139,92,246,.4);border-radius:16px;padding:18px}
 .out h2{font-size:13px;font-weight:900;text-transform:uppercase;letter-spacing:.08em;color:#c4b5fd;margin-bottom:10px}
@@ -95,6 +95,33 @@ button.test{background:rgba(52,211,153,.16);border:1px solid rgba(52,211,153,.45
         </div>
       </div>
 
+      <div class="panel">
+        <h2>✨ Анимация</h2>
+        <div class="row">
+          <label>Появление</label>
+          <select id="ain">
+            <option value="slide-right">Выезд справа</option>
+            <option value="slide-top">Падение сверху</option>
+            <option value="slide-bottom">Выезд снизу</option>
+            <option value="zoom">Увеличение</option>
+            <option value="fade">Простое появление (без движения)</option>
+          </select>
+        </div>
+        <div class="row">
+          <label>Исчезновение</label>
+          <select id="aout">
+            <option value="slide-right">Уезд вправо</option>
+            <option value="zoom">Уменьшение</option>
+            <option value="fade">Простое затухание</option>
+          </select>
+        </div>
+        <div class="row">
+          <label>Скорость анимации <b id="spdVal">0.45 с</b></label>
+          <input type="range" id="spd" min="20" max="150" step="5" value="45">
+          <div class="hint">Время появления и исчезновения карточки.</div>
+        </div>
+      </div>
+
       <div class="out">
         <h2>🔗 Ссылка для OBS</h2>
         <textarea class="url" id="url" readonly></textarea>
@@ -106,7 +133,7 @@ button.test{background:rgba(52,211,153,.16);border:1px solid rgba(52,211,153,.45
           <span class="num">1</span><b>Настрой ползунки</b> — превью справа обновится сразу.<br>
           <span class="num">2</span>Нажми <b>«Копировать ссылку»</b>.<br>
           <span class="num">3</span>В OBS: <b>Источники → + → Браузер</b> → вставь ссылку в <b>URL</b>.<br>
-          <span class="num">4</span>Ширина <b>300</b>, высота <b>500</b>, включи <b>«Управлять звуком через OBS»</b>.<br>
+          <span class="num">4</span>Ширина <b id="obsW">300</b>, высота <b id="obsH">500</b>, включи <b>«Управлять звуком через OBS»</b>.<br>
           <span class="num">5</span>Готово! Если источник уже был — просто замени URL в его свойствах.
         </div>
       </div>
@@ -127,9 +154,14 @@ button.test{background:rgba(52,211,153,.16);border:1px solid rgba(52,211,153,.45
 
   <div class="foot"><a href="index.html">← на страницу отправки</a> · <a href="dashboard.html">панель заявок</a></div>
 </div>
+<script src="protect.js"></script>
 <script>
 (function () {
   "use strict";
+
+  window.studioGate ? window.studioGate.require(startApp) : startApp();
+
+  function startApp() {
 
   var pvWrap = document.getElementById("pvWrap");
   var moni = document.getElementById("moni");
@@ -144,6 +176,12 @@ button.test{background:rgba(52,211,153,.16);border:1px solid rgba(52,211,153,.45
   var scaleEl = document.getElementById("scale");
   var scaleVal = document.getElementById("scaleVal");
   var urlEl = document.getElementById("url");
+  var ainEl = document.getElementById("ain");
+  var aoutEl = document.getElementById("aout");
+  var spdEl = document.getElementById("spd");
+  var spdVal = document.getElementById("spdVal");
+  var obsW = document.getElementById("obsW");
+  var obsH = document.getElementById("obsH");
 
   var DEMO = { nick: "ТЕСТ", message: "Так будет выглядеть уведомление о новом видео 👀" };
   var DEMO_ID = "dQw4w9WgXcQ";
@@ -153,7 +191,10 @@ button.test{background:rgba(52,211,153,.16);border:1px solid rgba(52,211,153,.45
       sound: soundEl.checked,
       vol: Number(volEl.value) / 100,
       dur: durMode.value === "custom" ? Number(durEl.value) : 0,
-      scale: Number(scaleEl.value) / 100
+      scale: Number(scaleEl.value) / 100,
+      ain: ainEl.value,
+      aout: aoutEl.value,
+      spd: Number(spdEl.value) / 100
     };
   }
 
@@ -165,9 +206,31 @@ button.test{background:rgba(52,211,153,.16);border:1px solid rgba(52,211,153,.45
     if (s.sound && s.vol !== 0.3) q.push("vol=" + s.vol);
     q.push("dur=" + s.dur);
     if (s.scale !== 1) q.push("scale=" + s.scale);
+    if (s.ain !== "slide-right") q.push("ain=" + s.ain);
+    if (s.aout !== "slide-right") q.push("aout=" + s.aout);
+    if (s.spd !== 0.45) q.push("spd=" + s.spd);
     if (withTest) q.push("test=1");
     return base + (q.length ? "?" + q.join("&") : "");
   }
+  /* ---------- генератор keyframes (тот же, что в виджете) ---------- */
+  function kfIn(type, s) {
+    var sc = s === 1 ? "" : " scale(" + s + ")";
+    var end = s === 1 ? "transform:none" : "transform:scale(" + s + ")";
+    if (type === "slide-top") return "@keyframes wIn{from{transform:translateY(-130%)" + sc + ";opacity:0}to{" + end + ";opacity:1}}";
+    if (type === "slide-bottom") return "@keyframes wIn{from{transform:translateY(130%)" + sc + ";opacity:0}to{" + end + ";opacity:1}}";
+    if (type === "zoom") return "@keyframes wIn{from{transform:scale(" + (s * 0.5) + ");opacity:0}to{" + end + ";opacity:1}}";
+    if (type === "fade") return "@keyframes wIn{from{opacity:0}to{opacity:1}}";
+    return "@keyframes wIn{from{transform:translateX(130%)" + sc + ";opacity:0}to{" + end + ";opacity:1}}";
+  }
+  function kfOut(type, s) {
+    var sc = s === 1 ? "" : " scale(" + s + ")";
+    if (type === "zoom") return "@keyframes wOut{to{transform:scale(" + (s * 0.5) + ");opacity:0}}";
+    if (type === "fade") return "@keyframes wOut{to{opacity:0}}";
+    return "@keyframes wOut{to{transform:translateX(130%)" + sc + "}}";
+  }
+  var animStyle = document.createElement("style");
+  document.head.appendChild(animStyle);
+
   /* ---------- превью карточки ---------- */
   function renderPreview() {
     var s = state();
@@ -249,9 +312,15 @@ button.test{background:rgba(52,211,153,.16);border:1px solid rgba(52,211,153,.45
 
   /* ---------- обновление всего ---------- */
   function refresh() {
+    var s = state();
     volVal.textContent = volEl.value + "%";
     durVal.textContent = durEl.value + " с";
     scaleVal.textContent = scaleEl.value + "%";
+    spdVal.textContent = s.spd.toFixed(2) + " с";
+    obsW.textContent = String(Math.ceil(300 * s.scale));
+    obsH.textContent = String(Math.ceil(520 * s.scale));
+    moni.style.width = Math.max(320, Math.ceil(280 * s.scale + 30)) + "px";
+    animStyle.textContent = kfIn(s.ain, 1) + kfOut(s.aout, 1);
     volRow.style.opacity = soundEl.checked ? "1" : ".4";
     volEl.disabled = !soundEl.checked;
     durRow.classList.toggle("hidden", durMode.value !== "custom");
@@ -261,9 +330,10 @@ button.test{background:rgba(52,211,153,.16);border:1px solid rgba(52,211,153,.45
 
   /* ---------- анимация превью заново ---------- */
   function replay() {
+    var s = state();
     pvWrap.style.animation = "none";
     void pvWrap.offsetWidth;
-    pvWrap.style.animation = "pvIn .45s cubic-bezier(.18,.9,.28,1.15) both";
+    pvWrap.style.animation = "wIn " + s.spd + "s cubic-bezier(.18,.9,.28,1.15) both";
     playTest();
   }
 
@@ -273,6 +343,10 @@ button.test{background:rgba(52,211,153,.16);border:1px solid rgba(52,211,153,.45
   durMode.addEventListener("change", refresh);
   durEl.addEventListener("input", refresh);
   scaleEl.addEventListener("input", refresh);
+  ainEl.addEventListener("change", function () { refresh(); replay(); });
+  aoutEl.addEventListener("change", function () { refresh(); replay(); });
+  spdEl.addEventListener("input", refresh);
+  spdEl.addEventListener("change", function () { refresh(); replay(); });
   document.getElementById("replay").addEventListener("click", replay);
 
   document.getElementById("copy").addEventListener("click", function () {
@@ -296,7 +370,7 @@ button.test{background:rgba(52,211,153,.16);border:1px solid rgba(52,211,153,.45
   refresh();
   window.setTimeout(replay, 300);
 
-
+  }
 })();
 </script>
 

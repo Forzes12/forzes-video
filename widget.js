@@ -14,8 +14,34 @@
   var MAXQ = (typeof SETTINGS !== "undefined" && SETTINGS.maxOnScreen) || 5;
   var SCALE = parseFloat(params.get("scale"));
   if (isNaN(SCALE) || SCALE < 0.4 || SCALE > 3) SCALE = 1;
+  var ANIM_IN = params.get("ain") || "slide-right";
+  var ANIM_OUT = params.get("aout") || "slide-right";
+  var SPD = parseFloat(params.get("spd"));
+  if (isNaN(SPD) || SPD < 0.1 || SPD > 3) SPD = 0.45;
 
   var wrap = document.getElementById("wrap");
+
+  /* ---------- анимация: keyframes генерируются под настройки ---------- */
+  function kfIn(type, s) {
+    var sc = s === 1 ? "" : " scale(" + s + ")";
+    var end = s === 1 ? "transform:none" : "transform:scale(" + s + ")";
+    if (type === "slide-top") return "@keyframes wIn{from{transform:translateY(-130%)" + sc + ";opacity:0}to{" + end + ";opacity:1}}";
+    if (type === "slide-bottom") return "@keyframes wIn{from{transform:translateY(130%)" + sc + ";opacity:0}to{" + end + ";opacity:1}}";
+    if (type === "zoom") return "@keyframes wIn{from{transform:scale(" + (s * 0.5) + ");opacity:0}to{" + end + ";opacity:1}}";
+    if (type === "fade") return "@keyframes wIn{from{opacity:0}to{opacity:1}}";
+    return "@keyframes wIn{from{transform:translateX(130%)" + sc + ";opacity:0}to{" + end + ";opacity:1}}";
+  }
+  function kfOut(type, s) {
+    var sc = s === 1 ? "" : " scale(" + s + ")";
+    if (type === "zoom") return "@keyframes wOut{to{transform:scale(" + (s * 0.5) + ");opacity:0}}";
+    if (type === "fade") return "@keyframes wOut{to{opacity:0}}";
+    return "@keyframes wOut{to{transform:translateX(130%)" + sc + "}}";
+  }
+  (function () {
+    var st = document.createElement("style");
+    st.textContent = kfIn(ANIM_IN, SCALE) + kfOut(ANIM_OUT, SCALE);
+    document.head.appendChild(st);
+  })();
 
   /* ---------- звук (WebAudio, без файлов) — мягкий короткий «блип» ---------- */
   var actx = null;
@@ -146,10 +172,10 @@
     function closeCard() {
       if (card._closed) return;
       card._closed = true;
-      card.classList.add("out");
+      card.style.animation = "wOut " + SPD + "s ease forwards";
       window.setTimeout(function () {
         if (card.parentNode) card.parentNode.removeChild(card);
-      }, 500);
+      }, SPD * 1000 + 60);
     }
 
     var card = buildCard(data, closeCard);
@@ -157,6 +183,7 @@
       card.style.transformOrigin = "top right";
       card.style.transform = "scale(" + SCALE + ")";
     }
+    card.style.animation = "wIn " + SPD + "s cubic-bezier(.18,.9,.28,1.15) both";
     wrap.appendChild(card);
     chime();
 

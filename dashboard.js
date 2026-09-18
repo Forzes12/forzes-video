@@ -1,6 +1,10 @@
-/* Панель заявок (dashboard.html) */
+/* Панель заявок (dashboard.html) — вход по паролю */
 (function () {
   "use strict";
+
+  window.studioGate ? window.studioGate.require(run) : run();
+
+  function run() {
 
   function $(id) { return document.getElementById(id); }
 
@@ -135,4 +139,6 @@
   ref.on("child_removed", function (snap) {
     removeItem(snap.key);
   });
+
+  }
 })();
