@@ -15,7 +15,7 @@
 
   var wrap = document.getElementById("wrap");
 
-  /* ---------- звук (WebAudio, без файлов) ---------- */
+  /* ---------- звук (WebAudio, без файлов) — мягкий короткий «блип» ---------- */
   var actx = null;
   function chime() {
     if (!SOUND) return;
@@ -25,20 +25,21 @@
       if (!actx) actx = new Ctx();
       if (actx.state === "suspended") actx.resume();
       var t = actx.currentTime;
-      var notes = [[880, 0], [1174.66, 0.16]]; /* A5 -> D6, «динь-дон» */
-      for (var i = 0; i < notes.length; i++) {
-        var o = actx.createOscillator();
-        var g = actx.createGain();
-        o.type = "sine";
-        o.frequency.value = notes[i][0];
-        g.gain.setValueAtTime(0.0001, t + notes[i][1]);
-        g.gain.exponentialRampToValueAtTime(Math.max(VOL, 0.001), t + notes[i][1] + 0.02);
-        g.gain.exponentialRampToValueAtTime(0.0001, t + notes[i][1] + 0.9);
-        o.connect(g);
-        g.connect(actx.destination);
-        o.start(t + notes[i][1]);
-        o.stop(t + notes[i][1] + 1);
-      }
+      /* одна мягкая нота с тёплым тембром (треугольник) и плавным затуханием */
+      var o = actx.createOscillator();
+      var g = actx.createGain();
+      var f = actx.createBiquadFilter(); /* срез верхов — убирает резкость */
+      f.type = "lowpass";
+      f.frequency.value = 1800;
+      o.type = "triangle";
+      o.frequency.setValueAtTime(660, t);
+      o.frequency.exponentialRampToValueAtTime(520, t + 0.18);
+      var v = Math.max(VOL, 0.001) * 0.5; /* доп. смягчение громкости */
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(v, t + 0.03);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.5);
+      o.connect(f); f.connect(g); g.connect(actx.destination);
+      o.start(t); o.stop(t + 0.6);
     } catch (e) { console.warn("Не удалось воспроизвести звук:", e); }
   }
 
