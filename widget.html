@@ -10,7 +10,9 @@
 <style>
 html,body{background:transparent;margin:0;padding:0;font-family:'Rubik',system-ui,sans-serif;overflow:hidden}
 #wrap{position:fixed;top:18px;right:18px;width:400px;display:flex;flex-direction:column;gap:12px}
-.card{background:rgba(13,16,30,.94);border:1px solid rgba(139,92,246,.55);border-radius:18px;padding:14px;box-shadow:0 12px 44px rgba(0,0,0,.65);color:#eef1ff;animation:in .55s cubic-bezier(.18,.9,.28,1.15) both}
+.card{position:relative;background:rgba(13,16,30,.94);border:1px solid rgba(139,92,246,.55);border-radius:18px;padding:14px;box-shadow:0 12px 44px rgba(0,0,0,.65);color:#eef1ff;animation:in .55s cubic-bezier(.18,.9,.28,1.15) both}
+.close{position:absolute;top:10px;right:10px;width:28px;height:28px;border-radius:9px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.08);color:#c7cdec;font-size:14px;line-height:1;cursor:pointer;font-family:inherit}
+.close:hover{background:rgba(248,113,113,.28);border-color:rgba(248,113,113,.5);color:#fff}
 @keyframes in{from{transform:translateX(115%) scale(.92);opacity:0}to{transform:none;opacity:1}}
 .card.out{animation:out .45s ease forwards}
 @keyframes out{to{transform:translateX(115%);opacity:0}}

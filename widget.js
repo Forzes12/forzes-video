@@ -8,8 +8,10 @@
   var VOL = parseFloat(params.get("vol"));
   if (isNaN(VOL)) VOL = (typeof SETTINGS !== "undefined" && SETTINGS.volume) || 0.6;
   var DUR = parseFloat(params.get("dur"));
-  if (isNaN(DUR)) DUR = (typeof SETTINGS !== "undefined" && SETTINGS.duration) || 14;
-  var MAXQ = (typeof SETTINGS !== "undefined" && SETTINGS.maxOnScreen) || 3;
+  if (isNaN(DUR)) {
+    DUR = (typeof SETTINGS !== "undefined" && typeof SETTINGS.duration === "number") ? SETTINGS.duration : 14;
+  }
+  var MAXQ = (typeof SETTINGS !== "undefined" && SETTINGS.maxOnScreen) || 5;
 
   var wrap = document.getElementById("wrap");
 
@@ -67,7 +69,7 @@
     return null;
   }
   /* ---------- карточка уведомления ---------- */
-  function buildCard(data) {
+  function buildCard(data, closeCard) {
     var card = document.createElement("div");
     card.className = "card";
 
@@ -80,6 +82,19 @@
     head.appendChild(dot);
     head.appendChild(title);
     card.appendChild(head);
+
+    /* кнопка «скип» — убрать карточку */
+    var close = document.createElement("button");
+    close.type = "button";
+    close.className = "close";
+    close.title = "Скип — убрать карточку";
+    close.setAttribute("aria-label", "Скип");
+    close.textContent = "✕";
+    close.addEventListener("click", function (ev) {
+      ev.preventDefault();
+      closeCard();
+    });
+    card.appendChild(close);
 
     var img = document.createElement("img");
     img.className = "thumb";
@@ -110,7 +125,10 @@
     open.href = data.link || ("https://youtu.be/" + data.vid);
     open.target = "_blank";
     open.rel = "noopener";
-    open.textContent = "▶ Открыть видео";
+    open.textContent = "▶ Смотреть видео";
+    open.addEventListener("click", function () {
+      window.setTimeout(closeCard, 400);
+    });
     row.appendChild(open);
     card.appendChild(row);
 
@@ -121,15 +139,24 @@
     while (wrap.children.length >= MAXQ && wrap.firstChild) {
       wrap.removeChild(wrap.firstChild);
     }
-    var card = buildCard(data);
-    wrap.appendChild(card);
-    chime();
-    window.setTimeout(function () {
+
+    function closeCard() {
+      if (card._closed) return;
+      card._closed = true;
       card.classList.add("out");
       window.setTimeout(function () {
         if (card.parentNode) card.parentNode.removeChild(card);
       }, 500);
-    }, DUR * 1000);
+    }
+
+    var card = buildCard(data, closeCard);
+    wrap.appendChild(card);
+    chime();
+
+    /* DUR = 0 — карточка висит, пока её не скипнут; DUR > 0 — авто-скрытие */
+    if (DUR > 0) {
+      window.setTimeout(closeCard, DUR * 1000);
+    }
   }
 
   /* ---------- тестовое уведомление (?test=1) ---------- */
