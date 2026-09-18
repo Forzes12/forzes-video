@@ -62,7 +62,7 @@ button.test{background:rgba(52,211,153,.16);border:1px solid rgba(52,211,153,.45
 <div class="bg"></div>
 <div class="wrap">
   <h1>⚙️ Настройки уведомлений <span>Forzes Stream</span></h1>
-  <p class="sub">Настрой звук и вид карточек, затем скопируй ссылку и вставь её в источник «Браузер» в OBS.</p>
+  <p class="sub">Настрой звук и вид карточек — OBS подхватит изменения сам. Ссылку ниже вставь в источник «Браузер» в OBS один раз.</p>
 
   <div class="grid">
     <div>
@@ -145,8 +145,8 @@ button.test{background:rgba(52,211,153,.16);border:1px solid rgba(52,211,153,.45
           <button type="button" class="test" id="test">▶ Проверить сейчас</button>
         </div>
         <div class="step">
-          <span class="num">1</span><b>Настрой ползунки</b> — превью справа обновится сразу.<br>
-          <span class="num">2</span>Нажми <b>«Копировать ссылку»</b>.<br>
+          <span class="num">1</span><b>Настрой ползунки</b> — OBS подхватит изменения сам, ссылка не меняется.<br>
+          <span class="num">2</span>Нажми <b>«Копировать ссылку»</b> — это нужно сделать один раз.<br>
           <span class="num">3</span>В OBS: <b>Источники → + → Браузер</b> → вставь ссылку в <b>URL</b>.<br>
           <span class="num">4</span>Ширина <b id="obsW">300</b>, высота <b id="obsH">500</b>, включи <b>«Управлять звуком через OBS»</b>.<br>
           <span class="num">5</span>Готово! Если источник уже был — просто замени URL в его свойствах.
@@ -308,6 +308,56 @@ button.test{background:rgba(52,211,153,.16);border:1px solid rgba(52,211,153,.45
     });
   }
 
+  /* ---------- настройки карточки живут в базе — ссылка для OBS постоянная ---------- */
+  var AINS = ["slide-right", "slide-top", "slide-bottom", "zoom", "fade"];
+  var AOUTS = ["slide-right", "zoom", "fade"];
+  var WKEY = (typeof SETTINGS !== "undefined" && SETTINGS.widgetKey) || "";
+  var settingsRef = sndDb ? sndDb.ref("widgetSettings") : null;
+  var setLoaded = false;
+  var setTimer = null;
+
+  function saveSettings() {
+    if (!settingsRef || !setLoaded) return;
+    if (setTimer) window.clearTimeout(setTimer);
+    setTimer = window.setTimeout(function () {
+      setTimer = null;
+      var s = state();
+      settingsRef.set({
+        sound: !!s.sound,
+        vol: s.vol,
+        dur: s.dur,
+        scale: s.scale,
+        ain: String(s.ain),
+        aout: String(s.aout),
+        spd: s.spd,
+        ts: Date.now()
+      })["catch"](function () {});
+    }, 600);
+  }
+
+  /* при открытии страницы показываем настройки, уже сохранённые в базе */
+  if (settingsRef) {
+    settingsRef.once("value").then(function (snap) {
+      var v = snap.val();
+      if (v) {
+        if (typeof v.sound === "boolean") soundEl.checked = v.sound;
+        if (typeof v.vol === "number") volEl.value = String(Math.min(Math.max(Math.round(v.vol * 100), 5), 100));
+        if (typeof v.dur === "number") {
+          durMode.value = v.dur > 0 ? "custom" : "0";
+          durEl.value = String(v.dur > 0 ? Math.min(Math.max(Math.round(v.dur), 5), 60) : 14);
+        }
+        if (typeof v.scale === "number") scaleEl.value = String(Math.min(Math.max(Math.round(v.scale * 100), 70), 150));
+        if (AINS.indexOf(v.ain) >= 0) ainEl.value = v.ain;
+        if (AOUTS.indexOf(v.aout) >= 0) aoutEl.value = v.aout;
+        if (typeof v.spd === "number") spdEl.value = String(Math.min(Math.max(Math.round(v.spd * 100), 20), 150));
+        refresh();
+      }
+      setLoaded = true;
+    })["catch"](function () { setLoaded = true; });
+  } else {
+    setLoaded = true;
+  }
+
   var DEMO = { nick: "ТЕСТ", message: "Так будет выглядеть уведомление о новом видео 👀" };
   var DEMO_ID = "dQw4w9WgXcQ";
 
@@ -324,17 +374,24 @@ button.test{background:rgba(52,211,153,.16);border:1px solid rgba(52,211,153,.45
   }
 
   function buildUrl(withTest) {
-    var s = state();
     var base = location.origin + location.pathname.replace(/settings\.html$/, "widget.html");
     var q = [];
-    if (!s.sound) q.push("sound=0");
-    if (s.sound && s.vol !== 0.3) q.push("vol=" + s.vol);
-    q.push("dur=" + s.dur);
-    if (s.scale !== 1) q.push("scale=" + s.scale);
-    if (s.ain !== "slide-right") q.push("ain=" + s.ain);
-    if (s.aout !== "slide-right") q.push("aout=" + s.aout);
-    if (s.spd !== 0.45) q.push("spd=" + s.spd);
-    if (window.studioGate && window.studioGate.hash) q.push("key=" + window.studioGate.hash);
+
+    if (WKEY) {
+      /* постоянная ссылка: настройки и звук живут в базе, OBS подхватывает их сам */
+      q.push("key=" + WKEY);
+    } else {
+      /* база не подключена — старый режим: настройки передаются в ссылке */
+      var s = state();
+      if (!s.sound) q.push("sound=0");
+      if (s.sound && s.vol !== 0.3) q.push("vol=" + s.vol);
+      q.push("dur=" + s.dur);
+      if (s.scale !== 1) q.push("scale=" + s.scale);
+      if (s.ain !== "slide-right") q.push("ain=" + s.ain);
+      if (s.aout !== "slide-right") q.push("aout=" + s.aout);
+      if (s.spd !== 0.45) q.push("spd=" + s.spd);
+    }
+
     if (withTest) q.push("test=1");
     return base + (q.length ? "?" + q.join("&") : "");
   }
@@ -454,6 +511,7 @@ button.test{background:rgba(52,211,153,.16);border:1px solid rgba(52,211,153,.45
     durRow.classList.toggle("hidden", durMode.value !== "custom");
     renderPreview();
     urlEl.value = buildUrl(false);
+    saveSettings();
   }
 
   /* ---------- анимация превью заново ---------- */

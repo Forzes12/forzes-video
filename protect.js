@@ -288,30 +288,8 @@
 
   window.studioGate = {
 
-    /* SHA-256-хеш пароля — settings.html вставляет его в ссылку виджета как ?key=... */
-    hash: HASH,
-
     /* без запоминания: пароль запрашивается при каждом открытии страницы */
     require: function (then) {
-      ask(then);
-    },
-
-    /* тихий вход по ключу в ссылке (?key=...) — для виджета в OBS.
-       Ключ — это хеш пароля: OBS открывает виджет без вопросов,
-       а все остальные видят запрос пароля. */
-    requireKey: function (then) {
-
-      var k = null;
-
-      try {
-        k = new URLSearchParams(location.search).get("key");
-      } catch (e) {}
-
-      if (k && k === HASH) {
-        then();
-        return;
-      }
-
       ask(then);
     }
   };

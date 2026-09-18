@@ -4,8 +4,13 @@
 
   /* Виджет открывается только по ссылке с ключом (?key=... — её генерирует
      settings.html для OBS) или после ввода пароля. */
-  if (window.studioGate && window.studioGate.requireKey) {
-    window.studioGate.requireKey(start);
+  var urlKey = null;
+  try { urlKey = new URLSearchParams(location.search).get("key"); } catch (e) {}
+
+  var WKEY = (typeof SETTINGS !== "undefined" && SETTINGS.widgetKey) || "";
+
+  if (window.studioGate && !(WKEY && urlKey === WKEY)) {
+    window.studioGate.require(start);
     return;
   }
   start();
@@ -29,6 +34,21 @@
   var SPD = parseFloat(params.get("spd"));
   if (isNaN(SPD) || SPD < 0.1 || SPD > 3) SPD = 0.45;
 
+  /* Текущие настройки: стартуют из ссылки, дальше их перекрывает база
+     (узел widgetSettings) — поэтому ссылка для OBS остаётся постоянной. */
+  var S = {
+    sound: SOUND,
+    vol: VOL,
+    dur: DUR,
+    scale: SCALE,
+    ain: ANIM_IN,
+    aout: ANIM_OUT,
+    spd: SPD
+  };
+
+  var AINS = ["slide-right", "slide-top", "slide-bottom", "zoom", "fade"];
+  var AOUTS = ["slide-right", "zoom", "fade"];
+
   var wrap = document.getElementById("wrap");
 
   /* ---------- анимация: keyframes генерируются под настройки ---------- */
@@ -47,11 +67,13 @@
     if (type === "fade") return "@keyframes wOut{to{opacity:0}}";
     return "@keyframes wOut{to{transform:translateX(130%)" + sc + "}}";
   }
-  (function () {
-    var st = document.createElement("style");
-    st.textContent = kfIn(ANIM_IN, SCALE) + kfOut(ANIM_OUT, SCALE);
-    document.head.appendChild(st);
-  })();
+  var animStyle = document.createElement("style");
+  document.head.appendChild(animStyle);
+
+  function applyAnim() {
+    animStyle.textContent = kfIn(S.ain, S.scale) + kfOut(S.aout, S.scale);
+  }
+  applyAnim();
 
   /* ---------- звук: свой mp3 из базы, иначе стандартный «блип» ---------- */
   var actx = null;
@@ -75,7 +97,7 @@
   /* rec = { b64, mime, name } из базы (узел widgetSound) */
   function applyCustomSound(rec) {
     customBuf = null;
-    if (!SOUND || !rec || typeof rec.b64 !== "string" || !rec.b64) return;
+    if (!S.sound || !rec || typeof rec.b64 !== "string" || !rec.b64) return;
     var ctx = ensureCtx();
     if (!ctx) return;
     try {
@@ -88,7 +110,7 @@
   }
 
   function chime() {
-    if (!SOUND) return;
+    if (!S.sound) return;
     var ctx = ensureCtx();
     if (!ctx) return;
 
@@ -98,7 +120,7 @@
         var src = ctx.createBufferSource();
         var cg = ctx.createGain();
         src.buffer = customBuf;
-        cg.gain.value = Math.min(Math.max(VOL, 0), 1);
+        cg.gain.value = Math.min(Math.max(S.vol, 0), 1);
         src.connect(cg); cg.connect(ctx.destination);
         src.start(0);
         return;
@@ -116,7 +138,7 @@
       o.type = "triangle";
       o.frequency.setValueAtTime(660, t);
       o.frequency.exponentialRampToValueAtTime(520, t + 0.18);
-      var v = Math.max(VOL, 0.001) * 0.5; /* доп. смягчение громкости */
+      var v = Math.max(S.vol, 0.001) * 0.5; /* доп. смягчение громкости */
       g.gain.setValueAtTime(0.0001, t);
       g.gain.exponentialRampToValueAtTime(v, t + 0.03);
       g.gain.exponentialRampToValueAtTime(0.0001, t + 0.5);
@@ -226,24 +248,24 @@
     function closeCard() {
       if (card._closed) return;
       card._closed = true;
-      card.style.animation = "wOut " + SPD + "s ease forwards";
+      card.style.animation = "wOut " + S.spd + "s ease forwards";
       window.setTimeout(function () {
         if (card.parentNode) card.parentNode.removeChild(card);
-      }, SPD * 1000 + 60);
+      }, S.spd * 1000 + 60);
     }
 
     var card = buildCard(data, closeCard);
-    if (SCALE !== 1) {
+    if (S.scale !== 1) {
       card.style.transformOrigin = "top right";
-      card.style.transform = "scale(" + SCALE + ")";
+      card.style.transform = "scale(" + S.scale + ")";
     }
-    card.style.animation = "wIn " + SPD + "s cubic-bezier(.18,.9,.28,1.15) both";
+    card.style.animation = "wIn " + S.spd + "s cubic-bezier(.18,.9,.28,1.15) both";
     wrap.appendChild(card);
     chime();
 
-    /* DUR = 0 — карточка висит, пока её не скипнут; DUR > 0 — авто-скрытие */
-    if (DUR > 0) {
-      window.setTimeout(closeCard, DUR * 1000);
+    /* dur = 0 — карточка висит, пока её не скипнут; dur > 0 — авто-скрытие */
+    if (S.dur > 0) {
+      window.setTimeout(closeCard, S.dur * 1000);
     }
   }
 
@@ -275,6 +297,20 @@
   db.ref("widgetSound").on("value", function (snap) {
     applyCustomSound(snap.val());
   }, function () { /* нет прав на узел — тихо играем стандартный звук */ });
+
+  /* настройки карточки: слушаем узел widgetSettings — изменения на лету */
+  db.ref("widgetSettings").on("value", function (snap) {
+    var v = snap.val();
+    if (!v) return;
+    if (typeof v.sound === "boolean") S.sound = v.sound;
+    if (typeof v.vol === "number") S.vol = Math.min(Math.max(v.vol, 0), 1);
+    if (typeof v.dur === "number") S.dur = Math.max(v.dur, 0);
+    if (typeof v.scale === "number") S.scale = Math.min(Math.max(v.scale, 0.4), 3);
+    if (AINS.indexOf(v.ain) >= 0) S.ain = v.ain;
+    if (AOUTS.indexOf(v.aout) >= 0) S.aout = v.aout;
+    if (typeof v.spd === "number") S.spd = Math.min(Math.max(v.spd, 0.1), 3);
+    applyAnim();
+  }, function () { /* нет прав — работаем на настройках из ссылки */ });
 
   var buffer = [];
   var baseline = null;

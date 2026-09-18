@@ -15,6 +15,11 @@ const SETTINGS = {
   duration: 0, 
   maxOnScreen: 5,
 
+  /* Постоянный ключ ссылки виджета для OBS. Ссылка вида widget.html?key=...
+     не меняется при смене настроек или пароля. Меняй только если ссылку
+     виджета увидел кто-то посторонний. */
+  widgetKey: "fz_w_7Kq92mXt4R8v",
+
   cooldown: 60,
   maxNick: 40,
   maxMessage: 500
