@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Forzes Stream — отправь видео на обзор</title>
+<meta name="description" content="Отправь своё видео стримеру Forzes — он посмотрит его в прямом эфире.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎬</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--line:rgba(255,255,255,.09);--txt:#eef1ff;--dim:#9aa3c7;--acc:#8b5cf6;--acc2:#3b82f6;--ok:#34d399;--err:#f87171}
+body{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:28px 16px;font-family:'Rubik',system-ui,'Segoe UI',Roboto,sans-serif;color:var(--txt);background:#0b0e1a;position:relative;overflow-x:hidden}
+.bg{position:fixed;inset:0;z-index:-1;background:radial-gradient(640px 420px at 12% 8%,rgba(139,92,246,.28),transparent 60%),radial-gradient(720px 480px at 88% 16%,rgba(59,130,246,.24),transparent 60%),radial-gradient(900px 640px at 50% 115%,rgba(139,92,246,.2),transparent 60%),#0b0e1a}
+.card{width:100%;max-width:580px;background:rgba(18,22,40,.86);border:1px solid var(--line);border-radius:22px;padding:30px 28px 24px;backdrop-filter:blur(14px);box-shadow:0 24px 70px rgba(0,0,0,.55)}
+.logo{display:flex;align-items:center;gap:11px;font-size:12px;font-weight:700;letter-spacing:.34em;text-transform:uppercase;color:var(--dim);margin-bottom:18px}
+.logo .mark{width:36px;height:36px;border-radius:11px;background:linear-gradient(135deg,#7c3aed,#2563eb);display:flex;align-items:center;justify-content:center;font-size:17px;box-shadow:0 6px 18px rgba(124,58,237,.45);flex:none}
+.logo b{background:linear-gradient(90deg,#c4b5fd,#93c5fd);-webkit-background-clip:text;background-clip:text;color:transparent}
+h1{font-size:23px;line-height:1.32;font-weight:900;margin-bottom:8px}
+h1 em{font-style:normal;background:linear-gradient(90deg,#a78bfa,#60a5fa);-webkit-background-clip:text;background-clip:text;color:transparent}
+.sub{color:var(--dim);font-size:14px;line-height:1.55}
+label{display:block;font-size:12.5px;font-weight:700;color:#b9c1e8;margin:16px 0 7px}
+input,textarea{width:100%;background:rgba(255,255,255,.05);border:1px solid var(--line);border-radius:13px;padding:13px 15px;color:var(--txt);font:inherit;font-size:14.5px;outline:none;transition:border-color .18s,box-shadow .18s}
+input::placeholder,textarea::placeholder{color:#5d6690}
+input:focus,textarea:focus{border-color:var(--acc);box-shadow:0 0 0 3px rgba(139,92,246,.22)}
+textarea{resize:vertical;min-height:104px;line-height:1.5}
+.rel{position:relative}
+.counter{position:absolute;right:12px;bottom:10px;font-size:11px;color:#5d6690;pointer-events:none}
+.preview{display:flex;align-items:center;gap:12px;margin-top:9px;background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:13px;padding:9px}
+.preview img{width:132px;aspect-ratio:16/9;object-fit:cover;border-radius:9px;background:#000;flex:none}
+.pv{font-size:12.5px;line-height:1.4}
+.pv.ok{color:var(--ok)}
+.pv.warn{color:#fbbf24}
+button{font:inherit;font-weight:700;cursor:pointer;border:none;border-radius:13px}
+#btn{width:100%;margin-top:20px;padding:15px 18px;font-size:15.5px;color:#fff;background:linear-gradient(90deg,#7c3aed,#2563eb);box-shadow:0 10px 28px rgba(124,58,237,.42);transition:transform .12s,box-shadow .2s,opacity .2s}
+#btn:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 14px 34px rgba(124,58,237,.55)}
+#btn:disabled{opacity:.55;cursor:not-allowed}
+#again{margin-top:14px;padding:11px 22px;font-size:13.5px;color:#c4b5fd;background:rgba(139,92,246,.14);border:1px solid rgba(139,92,246,.45)}
+#again:hover{background:rgba(139,92,246,.24)}
+.hp{position:absolute;left:-9999px;top:-9999px;width:0;height:0;opacity:0}
+.status{min-height:20px;margin-top:11px;font-size:13.5px;line-height:1.45}
+.status.err{color:var(--err)}
+.hidden{display:none!important}
+.success{text-align:center;padding:16px 0 8px}
+.success .emoji{font-size:58px;line-height:1;margin-bottom:12px;filter:drop-shadow(0 6px 18px rgba(139,92,246,.6))}
+.success h2{font-size:22px;font-weight:900;margin-bottom:8px}
+.success p{color:var(--dim);font-size:14px;line-height:1.6;max-width:420px;margin:0 auto}
+.warnbox{margin-top:16px;padding:11px 14px;border-radius:12px;border:1px solid rgba(251,191,36,.4);background:rgba(251,191,36,.08);color:#fcd34d;font-size:12.5px;line-height:1.55}
+.note{margin-top:20px;padding-top:16px;border-top:1px solid var(--line);font-size:12px;color:#6d76a3;line-height:1.7}
+.note a{color:#93c5fd;text-decoration:none}
+.note a:hover{text-decoration:underline}
+</style>
+</head>
+<body>
+<div class="bg"></div>
+<main class="card">
+  <div class="logo"><span class="mark">🎬</span><span>FORZES <b>STREAM</b></span></div>
+  <h1>Хочешь, чтобы я посмотрел <em>твоё видео</em> в прямом эфире?</h1>
+  <p class="sub">Заполни форму — во время стрима на экране появится уведомление с твоим роликом, и я открою его прямо в эфире.</p>
+
+  <div class="warnbox hidden" id="setupWarn">⚠️ База ещё не подключена: в файле <b>config.js</b> не вставлен конфиг Firebase. Стримеру нужно выполнить шаги 1–2 из README.md.</div>
+
+  <form id="form" novalidate autocomplete="off">
+    <label for="nick">Твой ник на канале / в чате</label>
+    <input id="nick" type="text" maxlength="40" placeholder="Например: ProGamer_2007">
+
+    <label for="link">Ссылка на видео (YouTube)</label>
+    <input id="link" type="text" placeholder="https://youtu.be/… или https://www.youtube.com/watch?v=…">
+    <div class="preview hidden" id="preview">
+      <img id="thumb" alt="Превью видео">
+      <span class="pv" id="pvText"></span>
+    </div>
+
+    <label for="msg">Описание — о чём видео и почему мне стоит его посмотреть</label>
+    <div class="rel">
+      <textarea id="msg" rows="4" maxlength="500" placeholder="Например: прошёл хоррор без единого скримера… ну почти 😅 Смотри с 5:30"></textarea>
+      <span class="counter"><span id="cnt">0</span>/<span id="msgMax">500</span></span>
+    </div>
+
+    <input id="hp" class="hp" type="text" tabindex="-1" aria-hidden="true">
+
+    <button id="btn" type="submit">🚀 Отправить на обзор</button>
+    <div class="status" id="status" role="alert"></div>
+  </form>
+
+  <div class="success hidden" id="success">
+    <div class="emoji">🎉</div>
+    <h2>Отправлено!</h2>
+    <p>Твоё видео в очереди. Стример увидит уведомление прямо во время стрима — если эфир идёт сейчас, скоро засветят и твоё.</p>
+    <button id="again" type="button">Отправить ещё одно видео</button>
+  </div>
+
+  <div class="note">
+    ⚠️ Принимаются ссылки на YouTube: обычные видео и Shorts.<br>
+    🚫 Спам и нерабочие ссылки удаляются. Видео попадёт в эфир не сразу — наберись терпения.<br>
+    🔒 Стример: <a href="dashboard.html">панель заявок</a>
+  </div>
+</main>
+<script src="config.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
+
