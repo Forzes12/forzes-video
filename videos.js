@@ -1,4 +1,6 @@
-/* Панель заявок (dashboard.html) — вход по паролю */
+/* Мои видео (videos.html) — вход по паролю.
+   Список всех присланных видео: ничего не пропадает, пока сам не удалишь.
+   Можно скроллить, искать, делиться ссылкой и удалять. Новые приходят сами. */
 (function () {
   "use strict";
 
@@ -9,11 +11,15 @@
   function $(id) { return document.getElementById(id); }
 
   var list = $("list");
-  var countEl = $("count");
+  var statEl = $("stat");
+  var emptyEl = $("empty");
   var errBox = $("err");
+  var searchEl = $("search");
   var db = initDatabase();
   var ref = null;
   var items = {}; /* key -> { root, data } */
+
+  var EMPTY_TEXT = "Пока никто не прислал видео. Как только зритель отправит ссылку — она появится здесь (и уведомлением в OBS).";
 
   function showError(text) {
     errBox.textContent = text;
@@ -34,42 +40,6 @@
     if (cls) e.className = cls;
     if (text != null) e.textContent = text;
     return e;
-  }
-
-  /* ---------- «поделиться»: системное меню или копирование ссылки ---------- */
-  function legacyCopy(text) {
-    var ta = document.createElement("textarea");
-    ta.value = text;
-    ta.style.cssText = "position:fixed;left:-9999px;top:0";
-    document.body.appendChild(ta);
-    ta.focus(); ta.select();
-    try { document.execCommand("copy"); } catch (e) {}
-    document.body.removeChild(ta);
-  }
-
-  function shareVideo(data, vid, btn) {
-    var url = data.link || ("https://youtu.be/" + (vid || ""));
-
-    if (navigator.share) {
-      navigator.share({ title: "Видео от " + (data.nick || "зрителя"), url: url })["catch"](function () {});
-      return;
-    }
-
-    function ok() {
-      btn.textContent = "✅ Скопировано!";
-      btn.disabled = true;
-      window.setTimeout(function () {
-        btn.textContent = "🔗 Поделиться";
-        btn.disabled = false;
-      }, 1600);
-    }
-
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(url).then(ok, function () { legacyCopy(url); ok(); });
-    } else {
-      legacyCopy(url);
-      ok();
-    }
   }
 
   function extractYouTubeId(raw) {
@@ -98,20 +68,89 @@
     return null;
   }
 
-  function recount() {
-    countEl.textContent = String(Object.keys(items).length);
+  /* ---------- поиск и счётчик ---------- */
+  function applyFilter() {
+    var q = (searchEl.value || "").trim().toLowerCase();
+    var keys = Object.keys(items);
+    var vis = 0;
+    for (var i = 0; i < keys.length; i++) {
+      var it = items[keys[i]];
+      var hay = ((it.data.nick || "") + " " + (it.data.message || "")).toLowerCase();
+      var show = !q || hay.indexOf(q) >= 0;
+      it.root.style.display = show ? "" : "none";
+      if (show) vis++;
+    }
+    if (q) {
+      statEl.textContent = "Найдено: " + vis + " из " + keys.length;
+      emptyEl.textContent = "Ничего не найдено по запросу «" + searchEl.value.trim() + "».";
+      emptyEl.classList.toggle("hidden", vis !== 0);
+    } else {
+      statEl.textContent = "Всего: " + keys.length;
+      emptyEl.textContent = EMPTY_TEXT;
+      emptyEl.classList.toggle("hidden", keys.length !== 0);
+    }
   }
 
+  searchEl.addEventListener("input", applyFilter);
+
+  /* ---------- «поделиться»: системное меню или копирование ссылки ---------- */
+  function legacyCopy(text) {
+    var ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.cssText = "position:fixed;left:-9999px;top:0";
+    document.body.appendChild(ta);
+    ta.focus(); ta.select();
+    try { document.execCommand("copy"); } catch (e) {}
+    document.body.removeChild(ta);
+  }
+
+  function share(data, btn) {
+    var vid = data.vid || extractYouTubeId(data.link) || "";
+    var url = data.link || ("https://youtu.be/" + vid);
+
+    if (navigator.share) {
+      navigator.share({ title: "Видео от " + (data.nick || "зрителя"), url: url })["catch"](function () {});
+      return;
+    }
+
+    function ok() {
+      btn.textContent = "✅ Скопировано!";
+      btn.disabled = true;
+      window.setTimeout(function () {
+        btn.textContent = "🔗 Поделиться";
+        btn.disabled = false;
+      }, 1600);
+    }
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(url).then(ok, function () { legacyCopy(url); ok(); });
+    } else {
+      legacyCopy(url);
+      ok();
+    }
+  }
+
+  /* ---------- карточка видео ---------- */
   function add(key, data) {
     if (!data || items[key]) return;
 
+    var vid = data.vid || extractYouTubeId(data.link);
+    var link = data.link || ("https://youtu.be/" + (vid || ""));
+
     var item = el("div", "item");
 
-    var vid = data.vid || extractYouTubeId(data.link);
+    var box = el("div", "thumbbox");
     var img = document.createElement("img");
     img.alt = "";
     if (vid) img.src = "https://i.ytimg.com/vi/" + vid + "/mqdefault.jpg";
-    item.appendChild(img);
+    box.appendChild(img);
+    box.appendChild(el("span", "play", "▶"));
+    box.title = "Открыть видео";
+    box.style.cursor = "pointer";
+    box.addEventListener("click", function () {
+      window.open(link, "_blank", "noopener");
+    });
+    item.appendChild(box);
 
     var info = el("div", "info");
 
@@ -124,21 +163,21 @@
 
     var acts = el("div", "acts");
 
-    var open = el("a", "linkbtn", "▶ Открыть видео");
-    open.href = data.link || ("https://youtu.be/" + (vid || ""));
+    var sh = el("button", "sh", "🔗 Поделиться");
+    sh.type = "button";
+    sh.addEventListener("click", function () { share(data, sh); });
+    acts.appendChild(sh);
+
+    var open = el("a", "linkbtn", "▶ Открыть");
+    open.href = link;
     open.target = "_blank";
     open.rel = "noopener";
     acts.appendChild(open);
 
-    var sh = el("button", "sh", "🔗 Поделиться");
-    sh.type = "button";
-    sh.addEventListener("click", function () { shareVideo(data, vid, sh); });
-    acts.appendChild(sh);
-
     var del = el("button", "del", "✕ Удалить");
     del.type = "button";
     del.addEventListener("click", function () {
-      if (!window.confirm("Удалить заявку от «" + (data.nick || "?") + "»?")) return;
+      if (!window.confirm("Удалить видео от «" + (data.nick || "?") + "»? Оно исчезнет и отсюда, и из уведомлений OBS, и с панели заявок.")) return;
       ref.child(key).remove().then(null, function (err) {
         showError("Не удалось удалить: " + ((err && err.message) || "ошибка"));
       });
@@ -150,7 +189,7 @@
 
     list.insertBefore(item, list.firstChild); /* новые — сверху */
     items[key] = { root: item, data: data };
-    recount();
+    applyFilter(); /* применит активный поиск и обновит счётчик */
   }
 
   function removeItem(key) {
@@ -158,10 +197,12 @@
     if (!it) return;
     if (it.root.parentNode) it.root.parentNode.removeChild(it.root);
     delete items[key];
-    recount();
+    applyFilter();
   }
 
   $("refresh").addEventListener("click", function () { location.reload(); });
+
+  applyFilter(); /* стартовое состояние: «Всего: 0» / пустой список */
 
   if (!db) {
     showError("База не подключена: заполни config.js (конфиг Firebase).");
