@@ -12,6 +12,8 @@
     DUR = (typeof SETTINGS !== "undefined" && typeof SETTINGS.duration === "number") ? SETTINGS.duration : 14;
   }
   var MAXQ = (typeof SETTINGS !== "undefined" && SETTINGS.maxOnScreen) || 5;
+  var SCALE = parseFloat(params.get("scale"));
+  if (isNaN(SCALE) || SCALE < 0.4 || SCALE > 3) SCALE = 1;
 
   var wrap = document.getElementById("wrap");
 
@@ -151,6 +153,10 @@
     }
 
     var card = buildCard(data, closeCard);
+    if (SCALE !== 1) {
+      card.style.transformOrigin = "top right";
+      card.style.transform = "scale(" + SCALE + ")";
+    }
     wrap.appendChild(card);
     chime();
 
