@@ -46,8 +46,8 @@
     spd: SPD
   };
 
-  var AINS = ["slide-right", "slide-top", "slide-bottom", "zoom", "fade"];
-  var AOUTS = ["slide-right", "zoom", "fade"];
+  var AINS = ["slide-right", "slide-left", "slide-top", "slide-bottom", "zoom", "fade"];
+  var AOUTS = ["slide-right", "slide-left", "zoom", "fade"];
 
   var wrap = document.getElementById("wrap");
 
@@ -57,6 +57,7 @@
     var end = s === 1 ? "transform:none" : "transform:scale(" + s + ")";
     if (type === "slide-top") return "@keyframes wIn{from{transform:translateY(-130%)" + sc + ";opacity:0}to{" + end + ";opacity:1}}";
     if (type === "slide-bottom") return "@keyframes wIn{from{transform:translateY(130%)" + sc + ";opacity:0}to{" + end + ";opacity:1}}";
+    if (type === "slide-left") return "@keyframes wIn{from{transform:translateX(-130%)" + sc + ";opacity:0}to{" + end + ";opacity:1}}";
     if (type === "zoom") return "@keyframes wIn{from{transform:scale(" + (s * 0.5) + ");opacity:0}to{" + end + ";opacity:1}}";
     if (type === "fade") return "@keyframes wIn{from{opacity:0}to{opacity:1}}";
     return "@keyframes wIn{from{transform:translateX(130%)" + sc + ";opacity:0}to{" + end + ";opacity:1}}";
@@ -65,6 +66,7 @@
     var sc = s === 1 ? "" : " scale(" + s + ")";
     if (type === "zoom") return "@keyframes wOut{to{transform:scale(" + (s * 0.5) + ");opacity:0}}";
     if (type === "fade") return "@keyframes wOut{to{opacity:0}}";
+    if (type === "slide-left") return "@keyframes wOut{to{transform:translateX(-130%)" + sc + "}}";
     return "@keyframes wOut{to{transform:translateX(130%)" + sc + "}}";
   }
   var animStyle = document.createElement("style");
@@ -345,7 +347,7 @@
       if (baseline === null || buffer[i].key > baseline) handle(buffer[i]);
     }
     buffer.length = 0;
-  }).catch(function (err) {
+  })["catch"](function (err) {
     ready = true;
     console.error(err);
   });

@@ -1,6 +1,10 @@
 /* Мои видео (videos.html) — вход по паролю.
    Список всех присланных видео: ничего не пропадает, пока сам не удалишь.
-   Можно скроллить, искать, делиться ссылкой и удалять. Новые приходят сами. */
+   Можно скроллить, искать, делиться ссылкой, смотреть и удалять.
+   Новые приходят сами, без обновления страницы. Пока вкладка не видна,
+   видео не показываются — при возврате каскадом выплывают справа, без звука.
+   «▶ Смотреть» открывает видео и запускает полосу-таймер снизу: когда полоса
+   истекает, карточка плавно убирается сама (как при удалении). */
 (function () {
   "use strict";
 
@@ -20,6 +24,29 @@
   var items = {}; /* key -> { root, data } */
 
   var EMPTY_TEXT = "Пока никто не прислал видео. Как только зритель отправит ссылку — она появится здесь (и уведомлением в OBS).";
+
+  /* ---------- «Смотреть»: настройки ---------- */
+  var WATCH_SECONDS = 15;   /* сколько секунд идёт полоса снизу */
+  var WATCH_DELETES = true; /* true — когда полоса кончилась, видео удаляется совсем (как кнопкой «Удалить»); false — карточка исчезает только со страницы */
+
+  /* пока вкладка не видна — новые видео копятся здесь и не показываются */
+  var pending = [];
+  document.addEventListener("visibilitychange", function () {
+    if (document.hidden || !pending.length) return;
+    var q = pending;
+    pending = [];
+    for (var i = 0; i < q.length; i++) add(q[i].key, q[i].data); /* каскад справа, без звука */
+  });
+
+  /* задержка старта анимации, чтобы карточки появлялись плавной волной */
+  var staggerIdx = 0, staggerIdle = null;
+  function nextDelay() {
+    if (staggerIdle) window.clearTimeout(staggerIdle);
+    var d = Math.min(staggerIdx, 12) * 80;
+    staggerIdx++;
+    staggerIdle = window.setTimeout(function () { staggerIdx = 0; }, 700);
+    return d;
+  }
 
   function showError(text) {
     errBox.textContent = text;
@@ -85,7 +112,7 @@
       emptyEl.textContent = "Ничего не найдено по запросу «" + searchEl.value.trim() + "».";
       emptyEl.classList.toggle("hidden", vis !== 0);
     } else {
-      statEl.textContent = "Всего: " + keys.length;
+      statEl.textContent = "Всего: " + keys.length + (pending.length ? " · +" + pending.length + " новых" : "");
       emptyEl.textContent = EMPTY_TEXT;
       emptyEl.classList.toggle("hidden", keys.length !== 0);
     }
@@ -168,10 +195,13 @@
     sh.addEventListener("click", function () { share(data, sh); });
     acts.appendChild(sh);
 
-    var open = el("a", "linkbtn", "▶ Открыть");
-    open.href = link;
-    open.target = "_blank";
-    open.rel = "noopener";
+    var open = el("button", "linkbtn", "▶ Смотреть");
+    open.type = "button";
+    open.title = "Открыть видео и запустить обратный отсчёт";
+    open.addEventListener("click", function () {
+      window.open(link, "_blank", "noopener");
+      startWatch(item, key);
+    });
     acts.appendChild(open);
 
     var del = el("button", "del", "✕ Удалить");
@@ -187,6 +217,10 @@
     info.appendChild(acts);
     item.appendChild(info);
 
+    /* плавное появление справа (без звука) */
+    item.style.animationDelay = nextDelay() + "ms";
+    item.classList.add("in");
+
     list.insertBefore(item, list.firstChild); /* новые — сверху */
     items[key] = { root: item, data: data };
     applyFilter(); /* применит активный поиск и обновит счётчик */
@@ -194,10 +228,66 @@
 
   function removeItem(key) {
     var it = items[key];
-    if (!it) return;
-    if (it.root.parentNode) it.root.parentNode.removeChild(it.root);
+    if (!it || it.removing) return;
+    it.removing = true;
     delete items[key];
+    stopWatch(it.root);
+
+    /* плавное исчезновение: влево + схлопывание высоты */
+    var root = it.root;
+    root.style.maxHeight = root.offsetHeight + "px"; /* фиксируем высоту для схлопывания */
+    root.classList.add("out");
+    window.setTimeout(function () {
+      if (root.parentNode) root.parentNode.removeChild(root);
+    }, 480);
     applyFilter();
+  }
+
+  /* ---------- «Смотреть»: полоса-таймер снизу, по окончании видео убирается ---------- */
+  function stopWatch(item) {
+    var w = item._watch;
+    if (!w) return;
+    if (w.fallback) window.clearTimeout(w.fallback);
+    item._watch = null;
+  }
+
+  function finishWatch(key, item) {
+    stopWatch(item);
+    removeItem(key); /* та же плавная анимация, что при удалении */
+    if (WATCH_DELETES && ref) {
+      ref.child(key).remove().then(null, function (err) {
+        showError("Видео убрано со страницы, но удалить из базы не удалось: " + ((err && err.message) || "ошибка"));
+      });
+    }
+  }
+
+  function startWatch(item, key) {
+    stopWatch(item);
+    var old = item.querySelector(".bar");
+    if (old && old.parentNode) old.parentNode.removeChild(old);
+
+    var bar = el("div", "bar");
+    var fill = el("span", "bar-fill");
+    bar.appendChild(fill);
+    item.appendChild(bar);
+
+    var finished = false;
+    function finish() {
+      if (finished) return;
+      finished = true;
+      finishWatch(key, item); /* полоса кончилась → убрать видео */
+    }
+
+    item._watch = { fallback: null };
+    fill.addEventListener("transitionend", function (ev) {
+      if (ev.propertyName === "width") finish();
+    });
+    item._watch.fallback = window.setTimeout(finish, WATCH_SECONDS * 1000 + 500);
+
+    /* полоса тает справа налево: ширина 100% → 0 линейно */
+    void fill.offsetWidth; /* reflow, чтобы transition точно сработал */
+    fill.style.transition = "width " + WATCH_SECONDS + "s linear";
+    fill.style.width = "0%";
   }
 
   $("refresh").addEventListener("click", function () { location.reload(); });
@@ -212,7 +302,16 @@
   ref = db.ref("submissions");
 
   ref.on("child_added", function (snap) {
-    add(snap.key, snap.val());
+    var key = snap.key;
+    var data = snap.val();
+    if (document.hidden) {
+      /* вкладка не на экране — видео не приходит, ждём возврата */
+      for (var i = 0; i < pending.length; i++) if (pending[i].key === key) return;
+      if (!items[key]) pending.push({ key: key, data: data });
+      applyFilter();
+      return;
+    }
+    add(key, data);
   }, function (err) {
     showError("Нет доступа к базе: " + ((err && err.message) || "ошибка") +
       ". Проверь правила доступа в Firebase (Realtime Database → Rules) — тестовый режим действует 30 дней.");

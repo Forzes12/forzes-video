@@ -116,6 +116,7 @@ button.test{background:rgba(52,211,153,.16);border:1px solid rgba(52,211,153,.45
           <label>Появление</label>
           <select id="ain">
             <option value="slide-right">Выезд справа</option>
+            <option value="slide-left">Выезд слева</option>
             <option value="slide-top">Падение сверху</option>
             <option value="slide-bottom">Выезд снизу</option>
             <option value="zoom">Увеличение</option>
@@ -126,6 +127,7 @@ button.test{background:rgba(52,211,153,.16);border:1px solid rgba(52,211,153,.45
           <label>Исчезновение</label>
           <select id="aout">
             <option value="slide-right">Уезд вправо</option>
+            <option value="slide-left">Уезд влево</option>
             <option value="zoom">Уменьшение</option>
             <option value="fade">Простое затухание</option>
           </select>
@@ -309,8 +311,8 @@ button.test{background:rgba(52,211,153,.16);border:1px solid rgba(52,211,153,.45
   }
 
   /* ---------- настройки карточки живут в базе — ссылка для OBS постоянная ---------- */
-  var AINS = ["slide-right", "slide-top", "slide-bottom", "zoom", "fade"];
-  var AOUTS = ["slide-right", "zoom", "fade"];
+  var AINS = ["slide-right", "slide-left", "slide-top", "slide-bottom", "zoom", "fade"];
+  var AOUTS = ["slide-right", "slide-left", "zoom", "fade"];
   var WKEY = (typeof SETTINGS !== "undefined" && SETTINGS.widgetKey) || "";
   var settingsRef = sndDb ? sndDb.ref("widgetSettings") : null;
   var setLoaded = false;
@@ -401,6 +403,7 @@ button.test{background:rgba(52,211,153,.16);border:1px solid rgba(52,211,153,.45
     var end = s === 1 ? "transform:none" : "transform:scale(" + s + ")";
     if (type === "slide-top") return "@keyframes wIn{from{transform:translateY(-130%)" + sc + ";opacity:0}to{" + end + ";opacity:1}}";
     if (type === "slide-bottom") return "@keyframes wIn{from{transform:translateY(130%)" + sc + ";opacity:0}to{" + end + ";opacity:1}}";
+    if (type === "slide-left") return "@keyframes wIn{from{transform:translateX(-130%)" + sc + ";opacity:0}to{" + end + ";opacity:1}}";
     if (type === "zoom") return "@keyframes wIn{from{transform:scale(" + (s * 0.5) + ");opacity:0}to{" + end + ";opacity:1}}";
     if (type === "fade") return "@keyframes wIn{from{opacity:0}to{opacity:1}}";
     return "@keyframes wIn{from{transform:translateX(130%)" + sc + ";opacity:0}to{" + end + ";opacity:1}}";
@@ -409,6 +412,7 @@ button.test{background:rgba(52,211,153,.16);border:1px solid rgba(52,211,153,.45
     var sc = s === 1 ? "" : " scale(" + s + ")";
     if (type === "zoom") return "@keyframes wOut{to{transform:scale(" + (s * 0.5) + ");opacity:0}}";
     if (type === "fade") return "@keyframes wOut{to{opacity:0}}";
+    if (type === "slide-left") return "@keyframes wOut{to{transform:translateX(-130%)" + sc + "}}";
     return "@keyframes wOut{to{transform:translateX(130%)" + sc + "}}";
   }
   var animStyle = document.createElement("style");
