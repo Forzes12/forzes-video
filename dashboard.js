@@ -36,39 +36,44 @@
     return e;
   }
 
-  /* ---------- «поделиться»: системное меню или копирование ссылки ---------- */
+  /* ---------- «поделиться»: сразу копируем ссылку на видео в буфер обмена ---------- */
   function legacyCopy(text) {
     var ta = document.createElement("textarea");
     ta.value = text;
-    ta.style.cssText = "position:fixed;left:-9999px;top:0";
+    ta.setAttribute("readonly", ""); /* чтобы iOS не скроллила и не меняла раскладку */
+    ta.style.cssText = "position:fixed;left:-9999px;top:0;opacity:0";
     document.body.appendChild(ta);
-    ta.focus(); ta.select();
-    try { document.execCommand("copy"); } catch (e) {}
+    ta.focus();
+    ta.select();
+    try { ta.setSelectionRange(0, text.length); } catch (e) {} /* для мобильных */
+    var okFlag = false;
+    try { okFlag = document.execCommand("copy"); } catch (e) { okFlag = false; }
     document.body.removeChild(ta);
+    return okFlag;
   }
 
   function shareVideo(data, vid, btn) {
     var url = data.link || ("https://youtu.be/" + (vid || ""));
+    if (!url) return;
 
-    if (navigator.share) {
-      navigator.share({ title: "Видео от " + (data.nick || "зрителя"), url: url })["catch"](function () {});
-      return;
-    }
-
-    function ok() {
-      btn.textContent = "✅ Скопировано!";
+    function done(text) {
+      btn.textContent = text;
       btn.disabled = true;
       window.setTimeout(function () {
         btn.textContent = "🔗 Поделиться";
         btn.disabled = false;
       }, 1600);
     }
+    function ok() { done("✅ Скопировано!"); }
+    function fail() { done("⚠ Не удалось"); }
 
+    /* сначала — современный Clipboard API, при отказе — запасной способ */
     if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(url).then(ok, function () { legacyCopy(url); ok(); });
+      navigator.clipboard.writeText(url).then(ok, function () {
+        legacyCopy(url) ? ok() : fail();
+      });
     } else {
-      legacyCopy(url);
-      ok();
+      legacyCopy(url) ? ok() : fail();
     }
   }
 
