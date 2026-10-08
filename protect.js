@@ -44,12 +44,40 @@
 
   var HASH = "8c9d3a99ef04df9ff53ba733332db0421fe1729a91982368639299793a1c4ac3";
 
-  var LS_KEY = "forzes_studio_ok";
+  /* Вход запоминается на этом устройстве: в хранилище лежит тот же
+     SHA-256-хэш, что и в коде (сам пароль нигде не сохраняется). */
+  var LS_KEY = "forzes_studio_ok";   /* «запомнить» — вход сохраняется навсегда */
+  var SS_KEY = "forzes_studio_src";  /* без галочки — вход только на время вкладки */
   var overlay = null;
 
-  /* Пароль теперь спрашивается при каждом заходе.
-     Стираем старую метку «уже вошёл», если она осталась с прошлых версий. */
-  try { localStorage.removeItem(LS_KEY); } catch (e) {}
+  function readToken() {
+    try {
+      return localStorage.getItem(LS_KEY) || sessionStorage.getItem(SS_KEY) || "";
+    } catch (e) { return ""; }
+  }
+
+  function isAuthed() {
+    return readToken() === HASH;
+  }
+
+  function saveToken(remember) {
+    try {
+      if (remember) {
+        localStorage.setItem(LS_KEY, HASH);
+        sessionStorage.removeItem(SS_KEY);
+      } else {
+        sessionStorage.setItem(SS_KEY, HASH);
+        localStorage.removeItem(LS_KEY);
+      }
+    } catch (e) {}
+  }
+
+  function forgetToken() {
+    try {
+      localStorage.removeItem(LS_KEY);
+      sessionStorage.removeItem(SS_KEY);
+    } catch (e) {}
+  }
 
   function sha256hex(str) {
     return crypto.subtle.digest(
@@ -110,7 +138,7 @@
       "line-height:1.5;margin-bottom:16px";
 
     p.textContent =
-      "Эта страница только для Forzes. Введи пароль, чтобы продолжить.";
+      "Эта страница только для Forzes. Введи пароль — вход сохранится, и в следующий раз спрашивать не будем.";
 
     card.appendChild(p);
 
@@ -142,6 +170,33 @@
     });
 
     card.appendChild(input);
+
+    /* галочка «запомнить вход» — по умолчанию включена */
+    var remember = document.createElement("label");
+
+    remember.style.cssText =
+      "display:flex;align-items:center;gap:8px;" +
+      "justify-content:center;" +
+      "margin-top:12px;" +
+      "font-size:12.5px;" +
+      "color:#9aa3c7;" +
+      "cursor:pointer";
+
+    var rememberBox = document.createElement("input");
+
+    rememberBox.type = "checkbox";
+    rememberBox.checked = true;
+    rememberBox.style.cssText =
+      "width:15px;height:15px;flex:none;" +
+      "accent-color:#8b5cf6;cursor:pointer";
+
+    var rememberText = document.createElement("span");
+
+    rememberText.textContent = "Запомнить вход на этом устройстве";
+
+    remember.appendChild(rememberBox);
+    remember.appendChild(rememberText);
+    card.appendChild(remember);
 
     var btn = document.createElement("button");
 
@@ -216,7 +271,8 @@
 
         if (hex === HASH) {
 
-          /* вход не запоминаем — при следующем заходе пароль спросится снова */
+          /* запоминаем вход — при следующем заходе пароль уже не спросим */
+          saveToken(!!(rememberBox && rememberBox.checked));
 
           overlay.parentNode.removeChild(overlay);
           overlay = null;
@@ -288,9 +344,23 @@
 
   window.studioGate = {
 
-    /* без запоминания: пароль запрашивается при каждом открытии страницы */
+    /* Если вход уже сохранён на этом устройстве — сразу пускаем дальше,
+       иначе просим пароль. */
     require: function (then) {
+      if (isAuthed()) {
+        then();
+        return;
+      }
       ask(then);
+    },
+
+    /* Вошёл ли уже стример (без запроса пароля) */
+    isAuthed: isAuthed,
+
+    /* Забыть сохранённый вход — пароль придётся ввести заново */
+    logout: function () {
+      forgetToken();
+      overlay = null;
     }
   };
 

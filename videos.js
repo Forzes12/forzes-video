@@ -188,10 +188,24 @@
 
     var top = el("div", "top");
     top.appendChild(el("span", "nick", data.nick || "Без имени"));
+
+    if (data.auth === "manual") {
+      top.appendChild(el("span", "tag warn", "⚠️ ник не проверен"));
+    } else if (data.platform) {
+      var pname = data.platform === "twitch" ? "🟣 Twitch"
+        : data.platform === "youtube" ? "▶ YouTube"
+        : String(data.platform);
+      top.appendChild(el("span", "tag", pname));
+    }
+
     top.appendChild(el("span", "time", fmtTime(data.ts)));
     info.appendChild(top);
 
-    info.appendChild(el("div", "desc", data.message || "—"));
+    if (data.message) {
+      info.appendChild(el("div", "desc", data.message));
+    } else {
+      info.appendChild(el("div", "desc none", "Комментарий не указан"));
+    }
 
     var acts = el("div", "acts");
 
@@ -296,6 +310,14 @@
   }
 
   $("refresh").addEventListener("click", function () { location.reload(); });
+
+  /* «Выйти» — забыть сохранённый вход, чтобы пароль снова спрашивался */
+  var logoutBtn = $("logout");
+  if (logoutBtn) logoutBtn.addEventListener("click", function () {
+    if (!window.confirm("Выйти из зоны стримера на этом устройстве? Пароль придётся вводить заново.")) return;
+    if (window.studioGate && window.studioGate.logout) window.studioGate.logout();
+    location.reload();
+  });
 
   applyFilter(); /* стартовое состояние: «Всего: 0» / пустой список */
 
