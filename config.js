@@ -22,7 +22,24 @@ const SETTINGS = {
 
   cooldown: 60,
   maxNick: 40,
-  maxMessage: 500
+  maxMessage: 500,
+
+  /* ---------- личность посетителя (антиподделка ника) ----------
+     Ник берётся из аккаунта Twitch через OAuth — вручную его не изменить.
+
+     Как получить Client ID:
+       1) https://dev.twitch.tv/console/apps → "Register Your Application"
+       2) OAuth Redirect URLs: точный адрес этой страницы,
+          например https://forzes-video.web.app/index.html
+          (и http://localhost:8080/index.html для проверки на компьютере)
+       3) скопируй Client ID сюда.
+
+     Пока тут пусто — отправка видео заблокирована (поле ника не заполняется). */
+  twitchClientId: "bfmw7coyj6mmd4haoy4ix9itbmy21f",
+
+  /* true — временно разрешить ввод ника вручную (ТОЛЬКО для теста!).
+     Пока это true, любой сможет написать от чужого имени. Оставляй false. */
+  allowManualNick: false
 };
 function firebaseConfigured() {
   const c = FIREBASE_CONFIG || {};
