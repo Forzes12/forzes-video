@@ -20,6 +20,94 @@
   var msgMax = $("msgMax");
   var setupWarn = $("setupWarn");
 
+  var idBadge = $("idBadge");
+  var idLock = $("idLock");
+  var idHint = $("idHint");
+  var twitchBtn = $("twitchBtn");
+  var switchAcc = $("switchAcc");
+
+  var identity = window.identity || null;
+  /* false — ник берётся только из подтверждённого аккаунта,
+     в поле писать нельзя и в базу уходит именно подтверждённое значение */
+  var MANUAL = !!(typeof SETTINGS !== "undefined" && SETTINGS.allowManualNick);
+
+  function currentIdentity() { return identity ? identity.current() : null; }
+
+  function platformLabel(p) {
+    if (p === "twitch") return "Twitch";
+    if (p === "youtube") return "YouTube";
+    if (p === "vk") return "VK";
+    if (p === "telegram") return "Telegram";
+    return p ? String(p).charAt(0).toUpperCase() + String(p).slice(1) : "";
+  }
+
+  /* с какой платформы человек перешёл: параметр ссылки (?src=twitch)
+     или источник перехода (document.referrer) */
+  function sourcePlatform() {
+    var p = "";
+    try {
+      var q = new URLSearchParams(location.search);
+      p = q.get("src") || q.get("from") || q.get("platform") || "";
+    } catch (e) {}
+
+    if (!p && document.referrer) {
+      try {
+        var h = new URL(document.referrer).hostname.replace(/^www\./i, "").toLowerCase();
+        if (h === "twitch.tv" || /\.twitch\.tv$/.test(h)) p = "twitch";
+        else if (h === "youtu.be" || /\.youtube\.com$/.test(h)) p = "youtube";
+        else if (h === "vk.com" || h === "vk.ru") p = "vk";
+        else if (h === "t.me" || h === "telegram.me") p = "telegram";
+      } catch (e) {}
+    }
+
+    p = String(p || "").toLowerCase().trim();
+    if (p === "twitch" || p === "youtube" || p === "vk" || p === "telegram") return p;
+    return "";
+  }
+
+  /* ---------- состояние поля ника ---------- */
+  function renderIdentity() {
+    var who = currentIdentity();
+
+    if (who) {
+      nick.readOnly = true;
+      nick.value = who.nick;
+      twitchBtn.classList.add("hidden");
+      switchAcc.classList.remove("hidden");
+      idLock.classList.remove("hidden");
+      idBadge.classList.remove("hidden");
+      idHint.classList.remove("warn");
+      idHint.textContent = "Ник из аккаунта " + platformLabel(who.platform) + " — изменить или подделать его нельзя.";
+      return;
+    }
+
+    idBadge.classList.add("hidden");
+    idLock.classList.add("hidden");
+    switchAcc.classList.add("hidden");
+
+    if (MANUAL) {
+      nick.readOnly = false;
+      nick.placeholder = "Например: ProGamer_2007";
+      twitchBtn.classList.add("hidden");
+      idHint.classList.add("warn");
+      idHint.textContent = "⚠ Режим без проверки: ник не подтверждён — сейчас любой может написать от чужого имени.";
+      return;
+    }
+
+    nick.value = "";
+    nick.readOnly = true;
+    nick.placeholder = "Нажми кнопку ниже — ник придёт из Twitch";
+    twitchBtn.classList.toggle("hidden", !(identity && identity.configured()));
+    idHint.classList.toggle("warn", !(identity && identity.configured()));
+
+    var src = sourcePlatform();
+    var from = src ? "Переход с " + platformLabel(src) + ". " : "";
+
+    idHint.textContent = (identity && identity.configured())
+      ? from + "ник берётся из аккаунта Twitch после входа — вручную его не изменить."
+      : "⛔ Авторизация Twitch не настроена: в config.js нужно вписать SETTINGS.twitchClientId. Пока отправка заблокирована.";
+  }
+
   var MAX_NICK = (typeof SETTINGS !== "undefined" && SETTINGS.maxNick) || 40;
   var MAX_MSG = (typeof SETTINGS !== "undefined" && SETTINGS.maxMessage) || 500;
   var COOLDOWN = (typeof SETTINGS !== "undefined" && SETTINGS.cooldown) || 60;
@@ -110,6 +198,35 @@
     counter.textContent = String(msg.value.length);
   });
 
+  if (identity) identity.onChange(renderIdentity);
+  renderIdentity();
+
+  twitchBtn.addEventListener("click", function () {
+    if (identity) identity.login();
+  });
+
+  switchAcc.addEventListener("click", function () {
+    if (!identity) return;
+    var who = currentIdentity();
+    var name = (who && who.nick) || "";
+    if (window.confirm("Выйти" + (name ? " из аккаунта " + name : "") + " и войти заново?")) {
+      identity.logout();
+    }
+  });
+
+  /* ник заблокирован: даже если его переписать в консоли,
+     в базу всё равно уйдёт подтверждённый логин */
+  nick.addEventListener("input", function () {
+    var who = currentIdentity();
+    if (who && nick.value !== who.nick) nick.value = who.nick;
+  });
+  nick.addEventListener("paste", function (e) {
+    if (nick.readOnly && e.preventDefault) e.preventDefault();
+  });
+  nick.addEventListener("drop", function (e) {
+    if (nick.readOnly && e.preventDefault) e.preventDefault();
+  });
+
   updateCooldown();
 
   /* ---------- отправка ---------- */
@@ -120,13 +237,24 @@
 
     if (hp.value) return; /* скрытое поле — защита от ботов */
 
-    var n = nick.value.trim();
+    var who = currentIdentity();
+    var n = who ? who.nick : nick.value.trim();
     var m = msg.value.trim();
     var id = extractYouTubeId(link.value);
 
+    if (!who && !MANUAL) {
+      if (identity && identity.configured()) {
+        twitchBtn.classList.remove("hidden");
+        fail("Ник можно взять только из аккаунта Twitch: нажми «Войти через Twitch» и отправь видео ещё раз.");
+      } else {
+        fail("⛔ Авторизация Twitch не настроена — в config.js нужно вписать SETTINGS.twitchClientId. Отправка заблокирована.");
+      }
+      return;
+    }
+
     if (n.length < 2) { fail("Напиши свой ник (минимум 2 символа)."); nick.focus(); return; }
     if (!id) { fail("Ссылка не похожа на видео YouTube. Пример: https://youtu.be/dQw4w9WgXcQ"); link.focus(); return; }
-    if (m.length < 3) { fail("Добавь описание — хотя бы пару слов о видео."); msg.focus(); return; }
+    /* комментарий к видео — по желанию: пустое поле отправке не мешает */
 
     var db = initDatabase();
     if (!db) {
@@ -137,13 +265,23 @@
     btn.disabled = true;
     btn.textContent = "Отправляю…";
 
-    db.ref("submissions").push({
+    var payload = {
       nick: n.slice(0, MAX_NICK),
       message: m.slice(0, MAX_MSG),
       link: "https://youtu.be/" + id,
       vid: id,
       ts: firebase.database.ServerValue.TIMESTAMP
-    }).then(function () {
+    };
+
+    if (who) {
+      payload.platform = who.platform;
+      payload.uid = who.userId || "";
+      payload.auth = "twitch";
+    } else {
+      payload.auth = "manual";
+    }
+
+    db.ref("submissions").push(payload).then(function () {
       try { localStorage.setItem(COOLDOWN_KEY, String(Date.now())); } catch (e) {}
       form.classList.add("hidden");
       success.classList.remove("hidden");
@@ -160,7 +298,7 @@
   again.addEventListener("click", function () {
     success.classList.add("hidden");
     form.classList.remove("hidden");
-    nick.value = "";
+    renderIdentity();
     link.value = "";
     msg.value = "";
     counter.textContent = "0";
