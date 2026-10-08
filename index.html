@@ -22,6 +22,7 @@ h1{font-size:23px;line-height:1.32;font-weight:900;margin-bottom:8px}
 h1 em{font-style:normal;background:linear-gradient(90deg,#a78bfa,#60a5fa);-webkit-background-clip:text;background-clip:text;color:transparent}
 .sub{color:var(--dim);font-size:14px;line-height:1.55}
 label{display:block;font-size:12.5px;font-weight:700;color:#b9c1e8;margin:16px 0 7px}
+label .opt{color:#6d76a3;font-weight:500}
 input,textarea{width:100%;background:rgba(255,255,255,.05);border:1px solid var(--line);border-radius:13px;padding:13px 15px;color:var(--txt);font:inherit;font-size:14.5px;outline:none;transition:border-color .18s,box-shadow .18s}
 input::placeholder,textarea::placeholder{color:#5d6690}
 input:focus,textarea:focus{border-color:var(--acc);box-shadow:0 0 0 3px rgba(139,92,246,.22)}
@@ -51,6 +52,16 @@ button{font:inherit;font-weight:700;cursor:pointer;border:none;border-radius:13p
 .note{margin-top:20px;padding-top:16px;border-top:1px solid var(--line);font-size:12px;color:#6d76a3;line-height:1.7}
 .note a{color:#93c5fd;text-decoration:none}
 .note a:hover{text-decoration:underline}
+.idbadge{display:inline-block;margin-left:7px;padding:2px 8px;border-radius:99px;background:rgba(52,211,153,.14);border:1px solid rgba(52,211,153,.4);color:var(--ok);font-size:10.5px;font-weight:700;letter-spacing:.02em;vertical-align:middle}
+.idrow{position:relative}
+.idrow input[readonly]{background:rgba(139,92,246,.1);border-color:rgba(139,92,246,.42);color:#c4b5fd;cursor:not-allowed}
+.idlock{position:absolute;right:14px;top:50%;transform:translateY(-50%);font-size:13px;pointer-events:none}
+.idfoot{display:flex;align-items:center;gap:10px;margin-top:9px}
+.twitchBtn{flex:1;padding:13px 16px;font-size:14.5px;color:#fff;background:#9146ff;box-shadow:0 8px 22px rgba(145,70,255,.35);transition:filter .15s,transform .12s}
+.twitchBtn:hover{filter:brightness(1.08);transform:translateY(-1px)}
+.linkbtn{background:none;border:none;padding:6px 0;color:#93c5fd;font-size:12.5px;font-weight:500;text-decoration:underline;cursor:pointer;white-space:nowrap}
+.idhint{margin-top:9px;font-size:12px;line-height:1.55;color:#6d76a3}
+.idhint.warn{color:#fbbf24}
 </style>
 </head>
 <body>
@@ -63,8 +74,16 @@ button{font:inherit;font-weight:700;cursor:pointer;border:none;border-radius:13p
   <div class="warnbox hidden" id="setupWarn">⚠️ База ещё не подключена: в файле <b>config.js</b> не вставлен конфиг Firebase. Стримеру нужно его заполнить.</div>
 
   <form id="form" novalidate autocomplete="off">
-    <label for="nick">Твой ник на канале / в чате</label>
-    <input id="nick" type="text" maxlength="40" placeholder="Например: ProGamer_2007">
+    <label for="nick">Твой ник <span class="idbadge hidden" id="idBadge">🔒 подтверждён</span></label>
+    <div class="idrow">
+      <input id="nick" type="text" maxlength="40" placeholder="Например: ProGamer_2007" readonly>
+      <span class="idlock hidden" id="idLock">🔒</span>
+    </div>
+    <div class="idfoot">
+      <button type="button" id="twitchBtn" class="twitchBtn hidden">🟣 Войти через Twitch</button>
+      <button type="button" id="switchAcc" class="linkbtn hidden">Сменить аккаунт</button>
+    </div>
+    <p class="idhint" id="idHint"></p>
 
     <label for="link">Ссылка на видео (YouTube)</label>
     <input id="link" type="text" placeholder="https://youtu.be/… или https://www.youtube.com/watch?v=…">
@@ -73,9 +92,9 @@ button{font:inherit;font-weight:700;cursor:pointer;border:none;border-radius:13p
       <span class="pv" id="pvText"></span>
     </div>
 
-    <label for="msg">Описание — о чём видео и почему мне стоит его посмотреть</label>
+    <label for="msg">Комментарий к видео <span class="opt">(по желанию)</span></label>
     <div class="rel">
-      <textarea id="msg" rows="4" maxlength="500" placeholder="Например: прошёл хоррор без единого скримера… ну почти 😅 Смотри с 5:30"></textarea>
+      <textarea id="msg" rows="4" maxlength="500" placeholder="Необязательно. Например: прошёл хоррор без единого скримера… ну почти 😅 Смотри с 5:30"></textarea>
       <span class="counter"><span id="cnt">0</span>/<span id="msgMax">500</span></span>
     </div>
 
@@ -101,6 +120,7 @@ button{font:inherit;font-weight:700;cursor:pointer;border:none;border-radius:13p
 <script src="config.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="identity.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
