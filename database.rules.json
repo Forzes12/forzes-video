@@ -1,0 +1,44 @@
+{
+  "rules": {
+    "submissions": {
+      ".read": true,
+      "$id": {
+        ".write": true,
+        ".validate": "newData.hasChildren(['nick','message','link','ts'])",
+        "nick":     { ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 40" },
+        "message":  { ".validate": "newData.isString() && newData.val().length <= 500" },
+        "link":     { ".validate": "newData.isString() && newData.val().length <= 300" },
+        "vid":      { ".validate": "newData.isString() && newData.val().length <= 16" },
+        "ts":       { ".validate": "newData.isNumber() && newData.val() <= now + 300000" },
+        "auth":     { ".validate": "newData.isString() && (newData.val() === 'manual' || newData.val() === 'twitch')" },
+        "platform": { ".validate": "newData.isString() && newData.val().length <= 20" },
+        "uid":      { ".validate": "newData.isString() && newData.val().length <= 64" },
+        "$other":   { ".validate": false }
+      }
+    },
+    "widgetSound": {
+      ".read": true,
+      ".write": true,
+      ".validate": "newData.hasChildren(['b64','mime','name'])",
+      "b64":  { ".validate": "newData.isString() && newData.val().length <= 2800000" },
+      "mime": { ".validate": "newData.isString() && newData.val().length <= 60" },
+      "name": { ".validate": "newData.isString() && newData.val().length <= 120" },
+      "ts":   { ".validate": "newData.isNumber()" },
+      "$other": { ".validate": false }
+    },
+    "widgetSettings": {
+      ".read": true,
+      ".write": true,
+      ".validate": "newData.hasChildren(['vol','dur','scale','ain','aout','spd'])",
+      "sound": { ".validate": "newData.isBoolean()" },
+      "vol":   { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 1" },
+      "dur":   { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 3600" },
+      "scale": { ".validate": "newData.isNumber() && newData.val() >= 0.4 && newData.val() <= 3" },
+      "ain":   { ".validate": "newData.isString() && newData.val().length <= 20" },
+      "aout":  { ".validate": "newData.isString() && newData.val().length <= 20" },
+      "spd":   { ".validate": "newData.isNumber() && newData.val() >= 0.1 && newData.val() <= 3" },
+      "ts":    { ".validate": "newData.isNumber()" },
+      "$other": { ".validate": false }
+    }
+  }
+}
