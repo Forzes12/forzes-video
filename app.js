@@ -288,7 +288,13 @@
       window.scrollTo({ top: 0, behavior: "smooth" });
     }).catch(function (err) {
       console.error(err);
-      fail("Не удалось отправить: " + ((err && err.message) || "ошибка сети") + ". Попробуй ещё раз.");
+      var code = (err && err.code) || "";
+      var msg = (err && err.message) || "ошибка сети";
+      if (code === "PERMISSION_DENIED" || /PERMISSION_DENIED/i.test(msg)) {
+        fail("⛔ База закрыта для записи (PERMISSION_DENIED). Стримеру: открой консоль Firebase → Realtime Database → Rules и опубликуй правила с разрешённой записью в submissions (см. README).");
+      } else {
+        fail("Не удалось отправить: " + msg + ". Попробуй ещё раз.");
+      }
       btn.disabled = false;
       updateCooldown();
     });

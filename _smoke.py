@@ -274,6 +274,7 @@ all_ok = True
 # 1) авторизация не настроена: поле заблокировано, отправка заблокирована
 all_ok &= run(
     "1. Client-ID не заполнен → отправка заблокирована",
+    pre_config='SETTINGS.twitchClientId = "";',
     checks=r"""
       var s = stateOf();
       eq("1 readOnly", s.readOnly, true);
