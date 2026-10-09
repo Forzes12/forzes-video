@@ -60,6 +60,15 @@
     return readToken() === HASH;
   }
 
+  /* Публичная страница отправки (корень сайта или index.html) — пароль
+     здесь не нужен и никогда не запрашивается. Остальные страницы
+     (dashboard, videos, settings, widget) остаются защищёнными. */
+  function isPublicPage() {
+    var path = "";
+    try { path = location.pathname || ""; } catch (e) { return false; }
+    return /\/$/.test(path) || /\/index\.html$/i.test(path);
+  }
+
   function saveToken(remember) {
     try {
       if (remember) {
@@ -344,10 +353,10 @@
 
   window.studioGate = {
 
-    /* Если вход уже сохранён на этом устройстве — сразу пускаем дальше,
-       иначе просим пароль. */
+    /* Если вход уже сохранён на этом устройстве или открыта публичная
+       страница — сразу пускаем дальше, иначе просим пароль. */
     require: function (then) {
-      if (isAuthed()) {
+      if (isPublicPage() || isAuthed()) {
         then();
         return;
       }
